@@ -5,4 +5,5 @@
 - Primary job: choose a 3D file, inspect it immediately, understand its size, and get a clearly labeled preliminary estimate.
 - Supported files in v1: STL, OBJ, and 3MF up to 50MB.
 - Privacy: files are parsed locally and are never uploaded or stored.
-- Out of scope: accounts, sharing, payment, order tracking, cloud storage, and exact slicer-based quotes.
+- Accounts: Supabase email/password and Google sign-in, with a lightweight profile and order history.
+- Out of scope: sharing, payment, cloud model storage, and exact slicer-based quotes.

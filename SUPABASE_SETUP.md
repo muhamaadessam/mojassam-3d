@@ -5,7 +5,9 @@
 3. Copy `.env.example` to `.env.local` and fill `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 4. In Vercel Project Settings → Environment Variables, add the same public variables for Production, Preview, and Development.
 5. Enable email/password in Supabase Authentication → Providers.
-6. Push to `main`; Vercel deploys the API routes and pages automatically.
+6. Enable Google in Supabase Authentication → Providers, then add the Google OAuth client ID/secret. Use `https://uwmefjrwozxpxkmyrtfe.supabase.co/auth/v1/callback` as the Google provider callback URL.
+7. In Supabase Authentication → URL Configuration, keep the site URL on the deployed Vercel domain and allow `/auth/callback`.
+8. Push to `main`; Vercel deploys the API routes and pages automatically.
 
 The public key can be used in the browser. Keep `SUPABASE_SERVICE_ROLE_KEY` server-only; it is intentionally not used by the customer-facing pages. RLS limits each customer to their own orders and model files.
 

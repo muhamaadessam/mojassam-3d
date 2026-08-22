@@ -7,6 +7,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { readPendingFile, savePendingFile } from '../lib/pending-file';
+import AuthNav from './account/auth-nav';
 
 type SupportedFormat = 'stl' | 'obj' | '3mf';
 type ViewerState = 'idle' | 'loading' | 'ready' | 'error';
@@ -558,7 +559,7 @@ export function StudioPage() {
         </nav>
         <div className="topbar-note"><span className="online-dot" /> {text.privacyStatus}</div>
         <div className="topbar-actions">
-          <a className="ghost-button account-link" href="/account">{text.account}</a>
+          <AuthNav language={language} />
           <button className="ghost-button language-button" onClick={() => setLanguage((value) => value === 'ar' ? 'en' : 'ar')} aria-label={text.language}>{text.language}</button>
           <button className="primary-button compact" onClick={() => fileInputRef.current?.click()}>{text.upload}</button>
         </div>
@@ -781,7 +782,7 @@ export default function Home() {
         </nav>
         <div className="topbar-note"><span className="online-dot" /> {text.privacyStatus}</div>
         <div className="topbar-actions">
-          <a className="ghost-button account-link" href="/account">{text.account}</a>
+          <AuthNav language={language} />
           <button className="ghost-button language-button" onClick={() => setLanguage((value) => value === 'ar' ? 'en' : 'ar')} aria-label={text.language}>{text.language}</button>
           <button className="primary-button compact" onClick={() => fileInputRef.current?.click()}>{text.upload}</button>
         </div>

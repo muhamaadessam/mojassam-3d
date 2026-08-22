@@ -1,11 +1,18 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import SignOutButton from './sign-out-button';
+import ProfileForm from './profile-form';
 
 export default async function AccountPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
+
+  const metadata = user.user_metadata as Record<string, string | undefined>;
+  const firstName = metadata.first_name || '';
+  const lastName = metadata.last_name || '';
+  const displayName = metadata.full_name || [firstName, lastName].filter(Boolean).join(' ') || user.email?.split('@')[0] || 'Account';
+  const avatarUrl = metadata.avatar_url || metadata.picture || '';
 
   const { data: orders } = await supabase
     .from('orders')
@@ -15,10 +22,11 @@ export default async function AccountPage() {
   return (
     <main className="account-page">
       <header className="account-header">
-        <div><a className="auth-back" href="/">← العودة للموقع</a><p className="eyebrow accent">MY ORDERS</p><h1>سجل طلباتك</h1><p>{user.email}</p></div>
+        <div className="account-heading"><a className="auth-back" href="/">← العودة للموقع</a><div className="account-title-row">{avatarUrl ? <img className="account-page-avatar" src={avatarUrl} alt="" referrerPolicy="no-referrer" /> : <span className="account-page-avatar account-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</span>}<div><p className="eyebrow accent">MY ACCOUNT</p><h1>{displayName}</h1><p>{user.email}</p></div></div></div>
         <SignOutButton />
       </header>
-      <section className="orders-list">
+      <ProfileForm firstName={firstName} lastName={lastName} avatarUrl={avatarUrl} />
+      <section className="orders-list" id="orders">
         {orders?.length ? orders.map((order) => (
           <article className="order-card" key={order.id}>
             <div><span className="order-status">{order.status}</span><h2>{order.design_name}</h2><p>{order.material} · {order.color || 'default'} · infill {order.infill}%</p></div>
