@@ -69,6 +69,7 @@ const READY_DESIGNS: ReadyDesign[] = [
 const COPY = {
   ar: {
     language: 'English',
+    account: 'تسجيل الدخول',
     studioNav: 'المعاينة والتسعير',
     storeNav: 'التصميمات الجاهزة',
     privacyStatus: 'الملف يفضل على جهازك',
@@ -132,9 +133,13 @@ const COPY = {
     orderNote: 'الطلب مبدئي — نؤكد التفاصيل والتسليم قبل التنفيذ.',
     confirmOrder: 'تأكيد الطلب المبدئي',
     orderConfirmed: 'تم تسجيل طلبك المبدئي. سنتواصل لتأكيد التفاصيل.',
+    loginRequired: 'سجّل دخولك أولًا لحفظ الطلب في سجل حسابك.',
+    orderSaving: 'جارٍ حفظ الطلب…',
+    orderFailed: 'تعذر حفظ الطلب الآن. حاول مرة أخرى.',
   },
   en: {
     language: 'العربية',
+    account: 'Sign in',
     studioNav: 'Preview & pricing',
     storeNav: 'Ready designs',
     privacyStatus: 'Your file stays on your device',
@@ -198,6 +203,9 @@ const COPY = {
     orderNote: 'Preliminary request — we confirm details and delivery before production.',
     confirmOrder: 'Confirm preliminary request',
     orderConfirmed: 'Your preliminary request is saved. We will contact you to confirm details.',
+    loginRequired: 'Sign in first to save this request to your account history.',
+    orderSaving: 'Saving request…',
+    orderFailed: 'Could not save the request. Try again.',
   },
 } as const;
 
@@ -330,6 +338,7 @@ export default function Home() {
   const [printColor, setPrintColor] = useState<PrintColor>(PRINT_COLORS[0]);
   const [orderDesign, setOrderDesign] = useState<ReadyDesign | null>(null);
   const [orderNotice, setOrderNotice] = useState('');
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [gridVisible, setGridVisible] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
   const [modelColor, setModelColor] = useState(() => getThemeColor(MATERIALS.pla.colorToken));
@@ -508,6 +517,37 @@ export default function Home() {
   const machineCost = estimatedMachineHours ? estimatedMachineHours * MACHINE_HOURLY_RATE : null;
   const estimatedPrice = materialCost !== null && machineCost !== null ? materialCost + machineCost : null;
 
+  const confirmReadyOrder = async () => {
+    if (!orderDesign) return;
+    setOrderSubmitting(true);
+    setOrderNotice(text.orderSaving);
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          designId: orderDesign.id,
+          designName: language === 'ar' ? orderDesign.nameAr : orderDesign.nameEn,
+          material: MATERIALS[orderDesign.material].label,
+          color: language === 'ar' ? printColor.ar : printColor.en,
+          infill: orderDesign.infill,
+          estimatedHours: orderDesign.printHours,
+          estimatedPrice: getReadyPrice(orderDesign),
+        }),
+      });
+      if (response.status === 401) {
+        setOrderNotice(text.loginRequired);
+        return;
+      }
+      if (!response.ok) throw new Error('order failed');
+      setOrderNotice(text.orderConfirmed);
+    } catch {
+      setOrderNotice(text.orderFailed);
+    } finally {
+      setOrderSubmitting(false);
+    }
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -521,6 +561,7 @@ export default function Home() {
         </nav>
         <div className="topbar-note"><span className="online-dot" /> {text.privacyStatus}</div>
         <div className="topbar-actions">
+          <a className="ghost-button account-link" href="/account">{text.account}</a>
           <button className="ghost-button language-button" onClick={() => setLanguage((value) => value === 'ar' ? 'en' : 'ar')} aria-label={text.language}>{text.language}</button>
           <button className="primary-button compact" onClick={() => fileInputRef.current?.click()}>{text.upload}</button>
         </div>
@@ -672,7 +713,7 @@ export default function Home() {
             <strong>{orderDesign ? (language === 'ar' ? orderDesign.nameAr : orderDesign.nameEn) : text.orderEmpty}</strong>
             {orderDesign && <p>{formatNumber(getReadyPrice(orderDesign))} {language === 'ar' ? 'ج.م' : 'EGP'} · {text.orderNote}</p>}
           </div>
-          <button className="primary-button" disabled={!orderDesign} onClick={() => setOrderNotice(text.orderConfirmed)}>{text.confirmOrder}</button>
+          <button className="primary-button" disabled={!orderDesign || orderSubmitting} onClick={confirmReadyOrder}>{orderSubmitting ? text.orderSaving : text.confirmOrder}</button>
           {orderNotice && <span className="order-notice">{orderNotice}</span>}
         </section>
       </section>
