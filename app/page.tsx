@@ -87,10 +87,10 @@ const COPY = {
     autoRotate: '◌ دوران تلقائي',
     grid: '▦ الشبكة',
     localSafe: 'تجربة محلية وآمنة',
-    start: 'ابدأ من هنا',
-    heroLine1: 'شوف تصميمك',
-    heroLine2: 'قبل ما تطبعه.',
-    intro: 'عاين التفاصيل، افهم الحجم، وخد فكرة عن التكلفة في مساحة واحدة.',
+    start: 'استوديو الطباعة',
+    heroLine1: 'ارفع ملفك',
+    heroLine2: 'واعرف التكلفة قبل الطباعة.',
+    intro: 'عاين المجسم 3D، راجع الأبعاد، وخد تقديرًا مبدئيًا قبل ما تبدأ الطباعة.',
     dropTitle: 'اسحب الملف هنا',
     dropSubtitle: 'أو اضغط لاختيار ملف من جهازك',
     designData: 'بيانات التصميم',
@@ -128,6 +128,9 @@ const COPY = {
     storeTitle: 'تصميمات جاهزة للطباعة',
     storeIntro: 'اختار قطعة جاهزة، شوف تكلفتها، وأضفها لطلبك في خطوة واحدة.',
     readyTag: 'جاهز للطباعة',
+    readyOrderTag: 'اطلبها مباشرة',
+    readyOrderNote: 'الخامة والامتلاء ووقت الطباعة محسوبين مسبقًا.',
+    orderNow: 'اطلب الآن',
     addToOrder: 'أضف للطلب',
     orderTitle: 'طلبك المبدئي',
     orderEmpty: 'لم تختار تصميمًا بعد.',
@@ -136,11 +139,11 @@ const COPY = {
     confirmOrder: 'تأكيد الطلب المبدئي',
     calculateCost: 'احسب التكلفة',
     calculatePrompt: 'راجع الإعدادات ثم احسب التكلفة التقديرية.',
-    homeUploadTitle: 'ارفع ملفك وابدأ من هنا',
-    homeUploadBody: 'اختار ملف STL أو OBJ أو 3MF، وبعدها افتح الاستوديو لمعاينة المجسم وحساب التكلفة.',
+    homeUploadTitle: 'ارفع ملف 3D واحسب التكلفة',
+    homeUploadBody: 'اختار ملف STL أو OBJ أو 3MF، عاينه داخل الاستوديو، واعرف تقدير التكلفة قبل الطباعة.',
     selectedFile: 'الملف جاهز للاستوديو',
     openStudio: 'افتح الاستوديو واحسب التكلفة',
-    browseDesigns: 'تصفح التصميمات الجاهزة',
+    browseDesigns: 'طلبات جاهزة بدون إعدادات إضافية',
     orderConfirmed: 'تم تسجيل طلبك المبدئي. سنتواصل لتأكيد التفاصيل.',
     loginRequired: 'سجّل دخولك أولًا لحفظ الطلب في سجل حسابك.',
     orderSaving: 'جارٍ حفظ الطلب…',
@@ -165,10 +168,10 @@ const COPY = {
     autoRotate: '◌ Auto-rotate',
     grid: '▦ Grid',
     localSafe: 'Private and local',
-    start: 'Start here',
-    heroLine1: 'See your design',
-    heroLine2: 'before you print it.',
-    intro: 'Inspect details, understand the size, and get a quick cost estimate in one place.',
+    start: 'Print studio',
+    heroLine1: 'Upload your file',
+    heroLine2: 'and know the cost before printing.',
+    intro: 'Inspect the 3D model, check its dimensions, and get a preliminary estimate before you start.',
     dropTitle: 'Drop your file here',
     dropSubtitle: 'or click to choose a file from your device',
     designData: 'Design data',
@@ -206,6 +209,9 @@ const COPY = {
     storeTitle: 'Ready-to-print designs',
     storeIntro: 'Choose a ready piece, see its cost, and add it to your request in one step.',
     readyTag: 'Ready to print',
+    readyOrderTag: 'Order directly',
+    readyOrderNote: 'Material, infill, and print time are already calculated.',
+    orderNow: 'Order now',
     addToOrder: 'Add to request',
     orderTitle: 'Your preliminary request',
     orderEmpty: 'No design selected yet.',
@@ -214,11 +220,11 @@ const COPY = {
     confirmOrder: 'Confirm preliminary request',
     calculateCost: 'Calculate cost',
     calculatePrompt: 'Review the settings, then calculate the preliminary cost.',
-    homeUploadTitle: 'Upload your file to get started',
-    homeUploadBody: 'Choose an STL, OBJ, or 3MF file, then open the studio to inspect the model and calculate its cost.',
+    homeUploadTitle: 'Upload a 3D file and price it',
+    homeUploadBody: 'Choose an STL, OBJ, or 3MF file, inspect it in the studio, and get a preliminary cost before printing.',
     selectedFile: 'File ready for the studio',
     openStudio: 'Open studio and calculate cost',
-    browseDesigns: 'Browse ready designs',
+    browseDesigns: 'Ready orders with no extra setup',
     orderConfirmed: 'Your preliminary request is saved. We will contact you to confirm details.',
     loginRequired: 'Sign in first to save this request to your account history.',
     orderSaving: 'Saving request…',
@@ -353,9 +359,6 @@ export function StudioPage() {
   const [unit, setUnit] = useState<UnitKey>('mm');
   const [infill, setInfill] = useState(20);
   const [printColor, setPrintColor] = useState<PrintColor>(PRINT_COLORS[0]);
-  const [orderDesign, setOrderDesign] = useState<ReadyDesign | null>(null);
-  const [orderNotice, setOrderNotice] = useState('');
-  const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [gridVisible, setGridVisible] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
   const [modelColor, setModelColor] = useState(() => getThemeColor(MATERIALS.pla.colorToken));
@@ -542,37 +545,6 @@ export function StudioPage() {
   const machineCost = estimatedMachineHours ? estimatedMachineHours * MACHINE_HOURLY_RATE : null;
   const estimatedPrice = materialCost !== null && machineCost !== null ? materialCost + machineCost : null;
 
-  const confirmReadyOrder = async () => {
-    if (!orderDesign) return;
-    setOrderSubmitting(true);
-    setOrderNotice(text.orderSaving);
-    try {
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          designId: orderDesign.id,
-          designName: language === 'ar' ? orderDesign.nameAr : orderDesign.nameEn,
-          material: MATERIALS[orderDesign.material].label,
-          color: language === 'ar' ? printColor.ar : printColor.en,
-          infill: orderDesign.infill,
-          estimatedHours: orderDesign.printHours,
-          estimatedPrice: getReadyPrice(orderDesign),
-        }),
-      });
-      if (response.status === 401) {
-        setOrderNotice(text.loginRequired);
-        return;
-      }
-      if (!response.ok) throw new Error('order failed');
-      setOrderNotice(text.orderConfirmed);
-    } catch {
-      setOrderNotice(text.orderFailed);
-    } finally {
-      setOrderSubmitting(false);
-    }
-  };
-
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -583,7 +555,6 @@ export function StudioPage() {
         <nav className="topbar-nav" aria-label={language === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'}>
           <a href="/">{text.home}</a>
           <a href="#studio">{text.studioNav}</a>
-          <a href="/#store">{text.storeNav}</a>
         </nav>
         <div className="topbar-note"><span className="online-dot" /> {text.privacyStatus}</div>
         <div className="topbar-actions">
@@ -718,40 +689,6 @@ export function StudioPage() {
         </aside>
       </div>
 
-      <section className="store-section" id="store" aria-labelledby="store-title">
-        <div className="store-header">
-          <div>
-            <p className="eyebrow accent">{text.storeNav}</p>
-            <h2 id="store-title">{text.storeTitle}</h2>
-            <p>{text.storeIntro}</p>
-          </div>
-          <span className="store-rate">{text.hourlyRate(formatNumber(MACHINE_HOURLY_RATE, 0))}</span>
-        </div>
-        <div className="store-grid">
-          {READY_DESIGNS.map((design) => (
-            <article className="store-card" key={design.id}>
-              {design.image ? <img className="product-image" src={design.image} alt={language === 'ar' ? design.nameAr : design.nameEn} /> : <div className={`product-art ${design.artClass}`} aria-hidden="true"><span /></div>}
-              <div className="store-card-body">
-                <div className="store-card-meta"><span>{language === 'ar' ? design.categoryAr : design.categoryEn}</span><span>{text.readyTag}</span></div>
-                <h3>{language === 'ar' ? design.nameAr : design.nameEn}</h3>
-                <p>{language === 'ar' ? design.descriptionAr : design.descriptionEn}</p>
-                <div className="product-specs"><span>{MATERIALS[design.material].label}</span><span>{text.infill}: {formatNumber(design.infill, 0)}%</span><span>{formatNumber(design.weightGrams, 0)} {language === 'ar' ? 'جم' : 'g'}</span><span>{formatNumber(design.printHours, 2)} {language === 'ar' ? 'ساعة' : 'h'}</span></div>
-                <div className="store-card-footer"><strong>{formatNumber(getReadyPrice(design))} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></strong><button className="tool-button" onClick={() => { setOrderDesign(design); setOrderNotice(text.orderAdded); }}>{text.addToOrder}</button></div>
-              </div>
-            </article>
-          ))}
-        </div>
-        <section className="order-summary" id="order-summary" aria-live="polite">
-          <div>
-            <p className="eyebrow accent">{text.orderTitle}</p>
-            <strong>{orderDesign ? (language === 'ar' ? orderDesign.nameAr : orderDesign.nameEn) : text.orderEmpty}</strong>
-            {orderDesign && <p>{formatNumber(getReadyPrice(orderDesign))} {language === 'ar' ? 'ج.م' : 'EGP'} · {text.orderNote}</p>}
-          </div>
-          <button className="primary-button" disabled={!orderDesign || orderSubmitting} onClick={confirmReadyOrder}>{orderSubmitting ? text.orderSaving : text.confirmOrder}</button>
-          {orderNotice && <span className="order-notice">{orderNotice}</span>}
-        </section>
-      </section>
-
       <footer className="footer-note"><span>3D Preview / v1</span><span>{text.footer}</span></footer>
     </main>
   );
@@ -762,6 +699,9 @@ export default function Home() {
   const [language, setLanguage] = useState<LanguageKey>('ar');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState('');
+  const [orderDesign, setOrderDesign] = useState<ReadyDesign | null>(null);
+  const [orderNotice, setOrderNotice] = useState('');
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
   const text = COPY[language];
 
   useEffect(() => {
@@ -791,6 +731,43 @@ export default function Home() {
     }
   };
 
+  const requestReadyDesign = (design: ReadyDesign) => {
+    setOrderDesign(design);
+    setOrderNotice(text.orderAdded);
+    requestAnimationFrame(() => document.getElementById('order-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  };
+
+  const confirmReadyOrder = async () => {
+    if (!orderDesign) return;
+    setOrderSubmitting(true);
+    setOrderNotice(text.orderSaving);
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          designId: orderDesign.id,
+          designName: language === 'ar' ? orderDesign.nameAr : orderDesign.nameEn,
+          material: MATERIALS[orderDesign.material].label,
+          color: language === 'ar' ? PRINT_COLORS[0].ar : PRINT_COLORS[0].en,
+          infill: orderDesign.infill,
+          estimatedHours: orderDesign.printHours,
+          estimatedPrice: getReadyPrice(orderDesign),
+        }),
+      });
+      if (response.status === 401) {
+        setOrderNotice(text.loginRequired);
+        return;
+      }
+      if (!response.ok) throw new Error('order failed');
+      setOrderNotice(text.orderConfirmed);
+    } catch {
+      setOrderNotice(text.orderFailed);
+    } finally {
+      setOrderSubmitting(false);
+    }
+  };
+
   return (
     <main className="home-shell">
       <header className="topbar">
@@ -806,6 +783,7 @@ export default function Home() {
         <div className="topbar-actions">
           <a className="ghost-button account-link" href="/account">{text.account}</a>
           <button className="ghost-button language-button" onClick={() => setLanguage((value) => value === 'ar' ? 'en' : 'ar')} aria-label={text.language}>{text.language}</button>
+          <button className="primary-button compact" onClick={() => fileInputRef.current?.click()}>{text.upload}</button>
         </div>
       </header>
 
@@ -846,22 +824,32 @@ export default function Home() {
             <h2 id="store-title">{text.storeTitle}</h2>
             <p>{text.storeIntro}</p>
           </div>
-          <a className="store-rate" href="/studio">{text.browseDesigns}</a>
+          <span className="store-rate">{text.browseDesigns}</span>
         </div>
         <div className="store-grid">
           {READY_DESIGNS.map((design) => (
             <article className="store-card" key={design.id}>
               {design.image ? <img className="product-image" src={design.image} alt={language === 'ar' ? design.nameAr : design.nameEn} /> : <div className={`product-art ${design.artClass}`} aria-hidden="true"><span /></div>}
               <div className="store-card-body">
-                <div className="store-card-meta"><span>{language === 'ar' ? design.categoryAr : design.categoryEn}</span><span>{text.readyTag}</span></div>
+                <div className="store-card-meta"><span>{language === 'ar' ? design.categoryAr : design.categoryEn}</span><span>{text.readyOrderTag}</span></div>
                 <h3>{language === 'ar' ? design.nameAr : design.nameEn}</h3>
                 <p>{language === 'ar' ? design.descriptionAr : design.descriptionEn}</p>
-                <div className="product-specs"><span>{MATERIALS[design.material].label}</span><span>{text.infill}: {formatNumber(design.infill, 0)}%</span><span>{formatNumber(design.weightGrams, 0)} {language === 'ar' ? 'جم' : 'g'}</span></div>
-                <div className="store-card-footer"><strong>{formatNumber(getReadyPrice(design))} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></strong><a className="tool-button" href="/studio">{text.openStudio}</a></div>
+                <p className="ready-order-note">{text.readyOrderNote}</p>
+                <div className="product-specs"><span>{MATERIALS[design.material].label}</span><span>{text.infill}: {formatNumber(design.infill, 0)}%</span><span>{formatNumber(design.weightGrams, 0)} {language === 'ar' ? 'جم' : 'g'}</span><span>{formatNumber(design.printHours, 2)} {language === 'ar' ? 'ساعة' : 'h'}</span></div>
+                <div className="store-card-footer"><strong>{formatNumber(getReadyPrice(design))} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></strong><button className="primary-button compact ready-order-button" onClick={() => requestReadyDesign(design)}>{text.orderNow}</button></div>
               </div>
             </article>
           ))}
         </div>
+        <section className="order-summary" id="order-summary" aria-live="polite">
+          <div>
+            <p className="eyebrow accent">{text.orderTitle}</p>
+            <strong>{orderDesign ? (language === 'ar' ? orderDesign.nameAr : orderDesign.nameEn) : text.orderEmpty}</strong>
+            {orderDesign && <p>{formatNumber(getReadyPrice(orderDesign))} {language === 'ar' ? 'ج.م' : 'EGP'} · {text.orderNote}</p>}
+          </div>
+          <button className="primary-button" disabled={!orderDesign || orderSubmitting} onClick={confirmReadyOrder}>{orderSubmitting ? text.orderSaving : text.confirmOrder}</button>
+          {orderNotice && <span className="order-notice">{orderNotice}</span>}
+        </section>
       </section>
 
       <footer className="footer-note"><span>3D Preview / v1</span><span>{text.footer}</span></footer>
