@@ -12,6 +12,19 @@ type ViewerState = 'idle' | 'loading' | 'ready' | 'error';
 type MaterialKey = 'pla' | 'petg';
 type UnitKey = 'mm' | 'cm' | 'in';
 type LanguageKey = 'ar' | 'en';
+type PrintColor = { id: string; ar: string; en: string; hex: string };
+type ReadyDesign = {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  categoryAr: string;
+  categoryEn: string;
+  weightGrams: number;
+  printHours: number;
+  artClass: string;
+};
 
 type ModelMetadata = {
   format: SupportedFormat;
@@ -36,9 +49,25 @@ const MATERIALS: Record<MaterialKey, PricingConfig> = {
 };
 const UNIT_FACTORS: Record<UnitKey, number> = { mm: 1, cm: 0.1, in: 1 / 25.4 };
 const UNIT_LABELS: Record<UnitKey, string> = { mm: 'mm', cm: 'cm', in: 'in' };
+const MACHINE_HOURLY_RATE = 15;
+const PRINT_COLORS: PrintColor[] = [
+  { id: 'lime', ar: 'ليموني', en: 'Lime', hex: '#b5f23d' },
+  { id: 'black', ar: 'أسود', en: 'Black', hex: '#171b28' },
+  { id: 'white', ar: 'أبيض', en: 'White', hex: '#f4f6f0' },
+  { id: 'blue', ar: 'أزرق', en: 'Blue', hex: '#5ba7ff' },
+  { id: 'orange', ar: 'برتقالي', en: 'Orange', hex: '#f59b5b' },
+  { id: 'pink', ar: 'وردي', en: 'Pink', hex: '#ef8fb5' },
+];
+const READY_DESIGNS: ReadyDesign[] = [
+  { id: 'desk-organizer', nameAr: 'منظّم مكتب', nameEn: 'Desk organizer', descriptionAr: 'خانات عملية للأقلام والكروت.', descriptionEn: 'Practical slots for pens and cards.', categoryAr: 'مكتب', categoryEn: 'Desk', weightGrams: 72, printHours: 2.5, artClass: 'organizer' },
+  { id: 'wave-vase', nameAr: 'مزهرية الموجة', nameEn: 'Wave vase', descriptionAr: 'شكل هادئ يضيف لمسة للمكان.', descriptionEn: 'A calm form that adds character to a room.', categoryAr: 'ديكور', categoryEn: 'Decor', weightGrams: 118, printHours: 4, artClass: 'vase' },
+  { id: 'phone-stand', nameAr: 'حامل موبايل', nameEn: 'Phone stand', descriptionAr: 'حامل ثابت للمكتب أو بجانب السرير.', descriptionEn: 'A stable stand for your desk or bedside.', categoryAr: 'إكسسوارات', categoryEn: 'Accessories', weightGrams: 54, printHours: 1.75, artClass: 'stand' },
+];
 const COPY = {
   ar: {
     language: 'English',
+    studioNav: 'المعاينة والتسعير',
+    storeNav: 'التصميمات الجاهزة',
     privacyStatus: 'الملف يفضل على جهازك',
     upload: '+ رفع ملف',
     noFile: 'لم يتم اختيار تصميم بعد',
@@ -72,6 +101,12 @@ const COPY = {
     pla: 'PLA · عملي وخفيف',
     petg: 'PETG · أقوى ومتين',
     infill: 'الامتلاء',
+    printColor: 'لون الطباعة',
+    printHours: 'ساعات التشغيل',
+    hourlyRate: (rate: string) => `${rate} ج.م / ساعة`,
+    materialCost: 'الخامة',
+    machineCost: 'تشغيل المكنة',
+    totalCost: 'التكلفة الإجمالية',
     approxPrice: 'السعر التقريبي',
     weightDetails: (weight: string, rate: string) => `وزن متوقع ${weight} جم · سعر ${rate} ج.م/جم`,
     noEstimate: 'ارفع ملفًا مغلقًا وقابلًا للحساب لإظهار التقدير',
@@ -83,9 +118,21 @@ const COPY = {
     tooLarge: 'الملف أكبر من 50MB. جرّب تصدير نسخة أخف.',
     parseError: 'لم نقدر نقرأ الملف. تأكد أنه ملف 3D سليم ثم جرّب مرة ثانية.',
     fileClosed: 'ارفع ملفًا مغلقًا وقابلًا للحساب لإظهار التقدير',
+    storeTitle: 'تصميمات جاهزة للطباعة',
+    storeIntro: 'اختار قطعة جاهزة، شوف تكلفتها، وأضفها لطلبك في خطوة واحدة.',
+    readyTag: 'جاهز للطباعة',
+    addToOrder: 'أضف للطلب',
+    orderTitle: 'طلبك المبدئي',
+    orderEmpty: 'لم تختار تصميمًا بعد.',
+    orderAdded: 'تمت إضافة التصميم للطلب المبدئي.',
+    orderNote: 'الطلب مبدئي — نؤكد التفاصيل والتسليم قبل التنفيذ.',
+    confirmOrder: 'تأكيد الطلب المبدئي',
+    orderConfirmed: 'تم تسجيل طلبك المبدئي. سنتواصل لتأكيد التفاصيل.',
   },
   en: {
     language: 'العربية',
+    studioNav: 'Preview & pricing',
+    storeNav: 'Ready designs',
     privacyStatus: 'Your file stays on your device',
     upload: '+ Upload file',
     noFile: 'No design selected yet',
@@ -119,6 +166,12 @@ const COPY = {
     pla: 'PLA · practical and light',
     petg: 'PETG · stronger and durable',
     infill: 'Infill',
+    printColor: 'Print color',
+    printHours: 'Machine hours',
+    hourlyRate: (rate: string) => `${rate} EGP / hour`,
+    materialCost: 'Material',
+    machineCost: 'Machine time',
+    totalCost: 'Total cost',
     approxPrice: 'Estimated price',
     weightDetails: (weight: string, rate: string) => `Expected weight ${weight} g · Rate ${rate} EGP/g`,
     noEstimate: 'Upload a closed, measurable file to show an estimate',
@@ -130,6 +183,16 @@ const COPY = {
     tooLarge: 'The file is larger than 50MB. Try exporting a lighter version.',
     parseError: 'We could not read this file. Make sure it is a valid 3D file and try again.',
     fileClosed: 'Upload a closed, measurable file to show an estimate',
+    storeTitle: 'Ready-to-print designs',
+    storeIntro: 'Choose a ready piece, see its cost, and add it to your request in one step.',
+    readyTag: 'Ready to print',
+    addToOrder: 'Add to request',
+    orderTitle: 'Your preliminary request',
+    orderEmpty: 'No design selected yet.',
+    orderAdded: 'Design added to your preliminary request.',
+    orderNote: 'Preliminary request — we confirm details and delivery before production.',
+    confirmOrder: 'Confirm preliminary request',
+    orderConfirmed: 'Your preliminary request is saved. We will contact you to confirm details.',
   },
 } as const;
 
@@ -151,6 +214,10 @@ function formatBytes(bytes: number) {
 
 function formatNumber(value: number, digits = 1) {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(value);
+}
+
+function getReadyPrice(design: ReadyDesign) {
+  return design.weightGrams * MATERIALS.pla.rate + design.printHours * MACHINE_HOURLY_RATE;
 }
 
 function parseModel(file: File, format: SupportedFormat) {
@@ -248,6 +315,10 @@ export default function Home() {
   const [materialKey, setMaterialKey] = useState<MaterialKey>('pla');
   const [unit, setUnit] = useState<UnitKey>('mm');
   const [infill, setInfill] = useState(20);
+  const [printHours, setPrintHours] = useState(2);
+  const [printColor, setPrintColor] = useState<PrintColor>(PRINT_COLORS[0]);
+  const [orderDesign, setOrderDesign] = useState<ReadyDesign | null>(null);
+  const [orderNotice, setOrderNotice] = useState('');
   const [gridVisible, setGridVisible] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
   const [modelColor, setModelColor] = useState(() => getThemeColor(MATERIALS.pla.colorToken));
@@ -421,7 +492,9 @@ export default function Home() {
     : '—';
   const effectiveFraction = Math.min(1, 0.15 + (infill / 100) * 0.85);
   const estimatedWeight = volumeCm3 ? volumeCm3 * selectedMaterial.density * effectiveFraction : null;
-  const estimatedPrice = estimatedWeight ? estimatedWeight * selectedMaterial.rate : null;
+  const materialCost = estimatedWeight ? estimatedWeight * selectedMaterial.rate : null;
+  const machineCost = printHours * MACHINE_HOURLY_RATE;
+  const estimatedPrice = materialCost ? materialCost + machineCost : null;
 
   return (
     <main className="app-shell">
@@ -430,6 +503,10 @@ export default function Home() {
           <div className="brand-mark" aria-hidden="true">◎</div>
           <div><p className="eyebrow">3D WORKSPACE</p><h1>3D Preview</h1></div>
         </div>
+        <nav className="topbar-nav" aria-label={language === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'}>
+          <a href="#studio">{text.studioNav}</a>
+          <a href="#store">{text.storeNav}</a>
+        </nav>
         <div className="topbar-note"><span className="online-dot" /> {text.privacyStatus}</div>
         <div className="topbar-actions">
           <button className="ghost-button language-button" onClick={() => setLanguage((value) => value === 'ar' ? 'en' : 'ar')} aria-label={text.language}>{text.language}</button>
@@ -437,7 +514,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="workspace">
+      <div className="workspace" id="studio">
         <section className="viewer-card" aria-label={language === 'ar' ? 'مساحة عرض التصميم ثلاثي الأبعاد' : '3D design preview area'}>
           <div className="viewer-header">
             <div><p className="eyebrow">LIVE PREVIEW</p><strong>{metadata?.fileName ?? text.noFile}</strong></div>
@@ -518,20 +595,75 @@ export default function Home() {
           <section className="pricing-card">
             <div className="section-heading"><span>{text.estimate}</span><span className="estimate-badge">{text.preliminary}</span></div>
             <div className="pricing-controls">
-              <label>{text.material}<select value={materialKey} onChange={(event) => { const next = event.target.value as MaterialKey; setMaterialKey(next); setModelColor(getThemeColor(MATERIALS[next].colorToken)); }}><option value="pla">{text.pla}</option><option value="petg">{text.petg}</option></select></label>
+              <label>{text.material}<select value={materialKey} onChange={(event) => setMaterialKey(event.target.value as MaterialKey)}><option value="pla">{text.pla}</option><option value="petg">{text.petg}</option></select></label>
               <label>{text.infill} <output>{infill}%</output><input type="range" min="10" max="100" step="5" value={infill} onChange={(event) => setInfill(Number(event.target.value))} /></label>
+              <label>{text.printHours}<output>{formatNumber(printHours, 2)}</output><input type="number" min="0.5" max="999" step="0.25" value={printHours} onChange={(event) => setPrintHours(Math.max(0.5, Number(event.target.value) || 0.5))} /></label>
+            </div>
+            <div className="color-picker">
+              <span>{text.printColor}</span>
+              <div className="color-swatches" role="radiogroup" aria-label={text.printColor}>
+                {PRINT_COLORS.map((color) => (
+                  <button
+                    key={color.id}
+                    className={`color-swatch ${printColor.id === color.id ? 'selected' : ''}`}
+                    style={{ backgroundColor: color.hex }}
+                    onClick={() => { setPrintColor(color); setModelColor(color.hex); }}
+                    aria-label={language === 'ar' ? color.ar : color.en}
+                    aria-pressed={printColor.id === color.id}
+                    type="button"
+                  />
+                ))}
+              </div>
             </div>
             <div className="price-result">
-              <span>{text.approxPrice}</span>
+              <span>{text.totalCost}</span>
               <strong>{estimatedPrice ? <>{formatNumber(estimatedPrice)} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></> : '—'}</strong>
+              <div className="cost-breakdown">
+                <span>{text.materialCost}<b>{materialCost ? `${formatNumber(materialCost)} ${language === 'ar' ? 'ج.م' : 'EGP'}` : '—'}</b></span>
+                <span>{text.machineCost}<b>{formatNumber(machineCost)} {language === 'ar' ? 'ج.م' : 'EGP'}</b></span>
+              </div>
               <p>{estimatedWeight ? text.weightDetails(formatNumber(estimatedWeight, 1), formatNumber(selectedMaterial.rate, 0)) : text.noEstimate}</p>
             </div>
-            <p className="fine-print">{text.estimateNote}</p>
+            <p className="fine-print">{text.estimateNote} · {text.hourlyRate(formatNumber(MACHINE_HOURLY_RATE, 0))}</p>
           </section>
 
           <div className="privacy-note"><span>◉</span><p><strong>{text.privacyTitle}</strong><br />{text.privacyBody}</p></div>
         </aside>
       </div>
+
+      <section className="store-section" id="store" aria-labelledby="store-title">
+        <div className="store-header">
+          <div>
+            <p className="eyebrow accent">{text.storeNav}</p>
+            <h2 id="store-title">{text.storeTitle}</h2>
+            <p>{text.storeIntro}</p>
+          </div>
+          <span className="store-rate">{text.hourlyRate(formatNumber(MACHINE_HOURLY_RATE, 0))}</span>
+        </div>
+        <div className="store-grid">
+          {READY_DESIGNS.map((design) => (
+            <article className="store-card" key={design.id}>
+              <div className={`product-art ${design.artClass}`} aria-hidden="true"><span /></div>
+              <div className="store-card-body">
+                <div className="store-card-meta"><span>{language === 'ar' ? design.categoryAr : design.categoryEn}</span><span>{text.readyTag}</span></div>
+                <h3>{language === 'ar' ? design.nameAr : design.nameEn}</h3>
+                <p>{language === 'ar' ? design.descriptionAr : design.descriptionEn}</p>
+                <div className="product-specs"><span>{formatNumber(design.weightGrams, 0)} {language === 'ar' ? 'جم' : 'g'}</span><span>{formatNumber(design.printHours, 2)} {language === 'ar' ? 'ساعة' : 'h'}</span></div>
+                <div className="store-card-footer"><strong>{formatNumber(getReadyPrice(design))} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></strong><button className="tool-button" onClick={() => { setOrderDesign(design); setOrderNotice(text.orderAdded); }}>{text.addToOrder}</button></div>
+              </div>
+            </article>
+          ))}
+        </div>
+        <section className="order-summary" id="order-summary" aria-live="polite">
+          <div>
+            <p className="eyebrow accent">{text.orderTitle}</p>
+            <strong>{orderDesign ? (language === 'ar' ? orderDesign.nameAr : orderDesign.nameEn) : text.orderEmpty}</strong>
+            {orderDesign && <p>{formatNumber(getReadyPrice(orderDesign))} {language === 'ar' ? 'ج.م' : 'EGP'} · {text.orderNote}</p>}
+          </div>
+          <button className="primary-button" disabled={!orderDesign} onClick={() => setOrderNotice(text.orderConfirmed)}>{text.confirmOrder}</button>
+          {orderNotice && <span className="order-notice">{orderNotice}</span>}
+        </section>
+      </section>
 
       <footer className="footer-note"><span>3D Preview / v1</span><span>{text.footer}</span></footer>
     </main>
