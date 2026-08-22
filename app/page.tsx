@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { readPendingFile, savePendingFile } from '../lib/pending-file';
 
 type SupportedFormat = 'stl' | 'obj' | '3mf';
 type ViewerState = 'idle' | 'loading' | 'ready' | 'error';
@@ -70,6 +71,7 @@ const COPY = {
   ar: {
     language: 'English',
     account: 'تسجيل الدخول',
+    home: 'الرئيسية',
     studioNav: 'المعاينة والتسعير',
     storeNav: 'التصميمات الجاهزة',
     privacyStatus: 'الملف يفضل على جهازك',
@@ -132,6 +134,13 @@ const COPY = {
     orderAdded: 'تمت إضافة التصميم للطلب المبدئي.',
     orderNote: 'الطلب مبدئي — نؤكد التفاصيل والتسليم قبل التنفيذ.',
     confirmOrder: 'تأكيد الطلب المبدئي',
+    calculateCost: 'احسب التكلفة',
+    calculatePrompt: 'راجع الإعدادات ثم احسب التكلفة التقديرية.',
+    homeUploadTitle: 'ارفع ملفك وابدأ من هنا',
+    homeUploadBody: 'اختار ملف STL أو OBJ أو 3MF، وبعدها افتح الاستوديو لمعاينة المجسم وحساب التكلفة.',
+    selectedFile: 'الملف جاهز للاستوديو',
+    openStudio: 'افتح الاستوديو واحسب التكلفة',
+    browseDesigns: 'تصفح التصميمات الجاهزة',
     orderConfirmed: 'تم تسجيل طلبك المبدئي. سنتواصل لتأكيد التفاصيل.',
     loginRequired: 'سجّل دخولك أولًا لحفظ الطلب في سجل حسابك.',
     orderSaving: 'جارٍ حفظ الطلب…',
@@ -140,6 +149,7 @@ const COPY = {
   en: {
     language: 'العربية',
     account: 'Sign in',
+    home: 'Home',
     studioNav: 'Preview & pricing',
     storeNav: 'Ready designs',
     privacyStatus: 'Your file stays on your device',
@@ -202,6 +212,13 @@ const COPY = {
     orderAdded: 'Design added to your preliminary request.',
     orderNote: 'Preliminary request — we confirm details and delivery before production.',
     confirmOrder: 'Confirm preliminary request',
+    calculateCost: 'Calculate cost',
+    calculatePrompt: 'Review the settings, then calculate the preliminary cost.',
+    homeUploadTitle: 'Upload your file to get started',
+    homeUploadBody: 'Choose an STL, OBJ, or 3MF file, then open the studio to inspect the model and calculate its cost.',
+    selectedFile: 'File ready for the studio',
+    openStudio: 'Open studio and calculate cost',
+    browseDesigns: 'Browse ready designs',
     orderConfirmed: 'Your preliminary request is saved. We will contact you to confirm details.',
     loginRequired: 'Sign in first to save this request to your account history.',
     orderSaving: 'Saving request…',
@@ -318,7 +335,7 @@ function calculateVolumeAndTriangles(object: THREE.Object3D) {
   };
 }
 
-export default function Home() {
+export function StudioPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewerHostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -342,6 +359,7 @@ export default function Home() {
   const [gridVisible, setGridVisible] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
   const [modelColor, setModelColor] = useState(() => getThemeColor(MATERIALS.pla.colorToken));
+  const [estimateRequested, setEstimateRequested] = useState(false);
   const text = COPY[language];
 
   useEffect(() => {
@@ -464,6 +482,7 @@ export default function Home() {
 
     setViewerState('loading');
     setError('');
+    setEstimateRequested(false);
     try {
       const model = await parseModel(file, format);
       // Printing files are typically Z-up; the viewer uses Y as its vertical axis.
@@ -491,6 +510,12 @@ export default function Home() {
       setError(text.parseError);
     }
   };
+
+  useEffect(() => {
+    void readPendingFile().then((file) => {
+      if (file) void loadFile(file);
+    }).catch(() => undefined);
+  }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -556,8 +581,9 @@ export default function Home() {
           <div><p className="eyebrow">3D WORKSPACE</p><h1>3D Preview</h1></div>
         </div>
         <nav className="topbar-nav" aria-label={language === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'}>
+          <a href="/">{text.home}</a>
           <a href="#studio">{text.studioNav}</a>
-          <a href="#store">{text.storeNav}</a>
+          <a href="/#store">{text.storeNav}</a>
         </nav>
         <div className="topbar-note"><span className="online-dot" /> {text.privacyStatus}</div>
         <div className="topbar-actions">
@@ -668,15 +694,23 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="price-result">
-              <span>{text.totalCost}</span>
-              <strong>{estimatedPrice ? <>{formatNumber(estimatedPrice)} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></> : '—'}</strong>
-              <div className="cost-breakdown">
-                <span>{text.materialCost}<b>{materialCost ? `${formatNumber(materialCost)} ${language === 'ar' ? 'ج.م' : 'EGP'}` : '—'}</b></span>
-                <span>{text.machineCost}<b>{machineCost ? `${formatNumber(machineCost)} ${language === 'ar' ? 'ج.م' : 'EGP'}` : '—'}</b></span>
+            {!estimateRequested && (
+              <div className="estimate-action">
+                <p>{metadata ? text.calculatePrompt : text.noEstimate}</p>
+                <button className="primary-button estimate-button" disabled={!metadata || estimatedPrice === null} onClick={() => setEstimateRequested(true)}>{text.calculateCost}</button>
               </div>
-              <p>{estimatedWeight ? text.weightDetails(formatNumber(estimatedWeight, 1), formatNumber(selectedMaterial.rate, 0)) : text.noEstimate}</p>
-            </div>
+            )}
+            {estimateRequested && (
+              <div className="price-result">
+                <span>{text.totalCost}</span>
+                <strong>{estimatedPrice !== null ? <>{formatNumber(estimatedPrice)} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></> : '—'}</strong>
+                <div className="cost-breakdown">
+                  <span>{text.materialCost}<b>{materialCost ? `${formatNumber(materialCost)} ${language === 'ar' ? 'ج.م' : 'EGP'}` : '—'}</b></span>
+                  <span>{text.machineCost}<b>{machineCost ? `${formatNumber(machineCost)} ${language === 'ar' ? 'ج.م' : 'EGP'}` : '—'}</b></span>
+                </div>
+                <p>{estimatedWeight ? text.weightDetails(formatNumber(estimatedWeight, 1), formatNumber(selectedMaterial.rate, 0)) : text.noEstimate}</p>
+              </div>
+            )}
             <p className="fine-print">{text.estimateNote} · {text.hourlyRate(formatNumber(MACHINE_HOURLY_RATE, 0))}</p>
           </section>
 
@@ -716,6 +750,118 @@ export default function Home() {
           <button className="primary-button" disabled={!orderDesign || orderSubmitting} onClick={confirmReadyOrder}>{orderSubmitting ? text.orderSaving : text.confirmOrder}</button>
           {orderNotice && <span className="order-notice">{orderNotice}</span>}
         </section>
+      </section>
+
+      <footer className="footer-note"><span>3D Preview / v1</span><span>{text.footer}</span></footer>
+    </main>
+  );
+}
+
+export default function Home() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [language, setLanguage] = useState<LanguageKey>('ar');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState('');
+  const text = COPY[language];
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.title = language === 'ar' ? '3D Preview — ابدأ طباعتك' : '3D Preview — Start your print';
+  }, [language]);
+
+  const chooseFile = async (file?: File) => {
+    if (!file) return;
+    if (!getFormat(file.name)) {
+      setFileError(text.unsupported);
+      setSelectedFile(null);
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError(text.tooLarge);
+      setSelectedFile(null);
+      return;
+    }
+    try {
+      await savePendingFile(file);
+      setSelectedFile(file);
+      setFileError('');
+    } catch {
+      setFileError(text.parseError);
+    }
+  };
+
+  return (
+    <main className="home-shell">
+      <header className="topbar">
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden="true">◎</div>
+          <div><p className="eyebrow">3D WORKSPACE</p><h1>3D Preview</h1></div>
+        </div>
+        <nav className="topbar-nav" aria-label={language === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'}>
+          <a href="/studio">{text.studioNav}</a>
+          <a href="#store">{text.storeNav}</a>
+        </nav>
+        <div className="topbar-note"><span className="online-dot" /> {text.privacyStatus}</div>
+        <div className="topbar-actions">
+          <a className="ghost-button account-link" href="/account">{text.account}</a>
+          <button className="ghost-button language-button" onClick={() => setLanguage((value) => value === 'ar' ? 'en' : 'ar')} aria-label={text.language}>{text.language}</button>
+        </div>
+      </header>
+
+      <section className="home-hero">
+        <div className="home-copy">
+          <p className="eyebrow accent">{text.start}</p>
+          <h2>{text.heroLine1}<br />{text.heroLine2}</h2>
+          <p>{text.intro}</p>
+          <div className="home-proof"><span>01</span><span>{text.homeUploadBody}</span></div>
+        </div>
+        <div className="home-upload-card">
+          <div className="upload-card-heading">
+            <div><p className="eyebrow">STUDIO ENTRY</p><h2>{text.homeUploadTitle}</h2></div>
+            <span className="upload-card-mark">↥</span>
+          </div>
+          <p className="home-upload-body">{text.homeUploadBody}</p>
+          <label
+            className={`home-dropzone ${selectedFile ? 'has-file' : ''}`}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => { event.preventDefault(); void chooseFile(event.dataTransfer.files?.[0]); }}
+          >
+            <input ref={fileInputRef} type="file" accept=".stl,.obj,.3mf" onChange={(event) => void chooseFile(event.target.files?.[0])} />
+            <span className="home-dropzone-icon">{selectedFile ? '✓' : '↥'}</span>
+            <strong>{selectedFile ? selectedFile.name : text.dropTitle}</strong>
+            <span>{selectedFile ? `${formatBytes(selectedFile.size)} · ${text.selectedFile}` : text.dropSubtitle}</span>
+            <small>STL · OBJ · 3MF <i>{language === 'ar' ? 'حتى 50MB' : 'up to 50MB'}</i></small>
+          </label>
+          {fileError && <p className="home-file-error" role="alert">{fileError}</p>}
+          <button className="primary-button home-upload-action" disabled={!selectedFile} onClick={() => { window.location.href = '/studio'; }}>{text.openStudio}</button>
+          <p className="home-local-note"><span>◉</span>{text.privacyBody}</p>
+        </div>
+      </section>
+
+      <section className="store-section home-store" id="store" aria-labelledby="store-title">
+        <div className="store-header">
+          <div>
+            <p className="eyebrow accent">{text.storeNav}</p>
+            <h2 id="store-title">{text.storeTitle}</h2>
+            <p>{text.storeIntro}</p>
+          </div>
+          <a className="store-rate" href="/studio">{text.browseDesigns}</a>
+        </div>
+        <div className="store-grid">
+          {READY_DESIGNS.map((design) => (
+            <article className="store-card" key={design.id}>
+              {design.image ? <img className="product-image" src={design.image} alt={language === 'ar' ? design.nameAr : design.nameEn} /> : <div className={`product-art ${design.artClass}`} aria-hidden="true"><span /></div>}
+              <div className="store-card-body">
+                <div className="store-card-meta"><span>{language === 'ar' ? design.categoryAr : design.categoryEn}</span><span>{text.readyTag}</span></div>
+                <h3>{language === 'ar' ? design.nameAr : design.nameEn}</h3>
+                <p>{language === 'ar' ? design.descriptionAr : design.descriptionEn}</p>
+                <div className="product-specs"><span>{MATERIALS[design.material].label}</span><span>{text.infill}: {formatNumber(design.infill, 0)}%</span><span>{formatNumber(design.weightGrams, 0)} {language === 'ar' ? 'جم' : 'g'}</span></div>
+                <div className="store-card-footer"><strong>{formatNumber(getReadyPrice(design))} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></strong><a className="tool-button" href="/studio">{text.openStudio}</a></div>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
       <footer className="footer-note"><span>3D Preview / v1</span><span>{text.footer}</span></footer>
