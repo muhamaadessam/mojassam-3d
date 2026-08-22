@@ -25,16 +25,21 @@ type PricingConfig = {
   density: number;
   rate: number;
   label: string;
-  color: string;
+  colorToken: string;
 };
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const MATERIALS: Record<MaterialKey, PricingConfig> = {
-  pla: { density: 1.24, rate: 6, label: 'PLA', color: '#b9f26c' },
-  petg: { density: 1.27, rate: 8, label: 'PETG', color: '#7dd3fc' },
+  pla: { density: 1.24, rate: 6, label: 'PLA', colorToken: '--color-brand' },
+  petg: { density: 1.27, rate: 8, label: 'PETG', colorToken: '--color-info' },
 };
 const UNIT_FACTORS: Record<UnitKey, number> = { mm: 1, cm: 0.1, in: 1 / 25.4 };
 const UNIT_LABELS: Record<UnitKey, string> = { mm: 'mm', cm: 'cm', in: 'in' };
+
+function getThemeColor(token: string) {
+  if (typeof document === 'undefined') return '#ffffff';
+  return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || '#ffffff';
+}
 
 function getFormat(fileName: string): SupportedFormat | null {
   const extension = fileName.split('.').pop()?.toLowerCase();
@@ -58,7 +63,7 @@ function parseModel(file: File, format: SupportedFormat) {
       geometry.computeVertexNormals();
       return new THREE.Mesh(
         geometry,
-        new THREE.MeshStandardMaterial({ color: MATERIALS.pla.color, roughness: 0.68, metalness: 0.05 }),
+        new THREE.MeshStandardMaterial({ color: getThemeColor(MATERIALS.pla.colorToken), roughness: 0.68, metalness: 0.05 }),
       );
     }
 
@@ -76,14 +81,13 @@ function disposeObject(object: THREE.Object3D) {
   });
 }
 
-function applyModelStyle(object: THREE.Object3D, color: string, wireframe: boolean) {
+function applyModelStyle(object: THREE.Object3D, color: string) {
   object.traverse((child) => {
     const mesh = child as THREE.Mesh;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     materials.filter(Boolean).forEach((material) => {
       const modelMaterial = material as THREE.MeshStandardMaterial;
       if (modelMaterial.color) modelMaterial.color.set(color);
-      if ('wireframe' in modelMaterial) modelMaterial.wireframe = wireframe;
       modelMaterial.needsUpdate = true;
     });
   });
@@ -146,17 +150,16 @@ export default function Home() {
   const [materialKey, setMaterialKey] = useState<MaterialKey>('pla');
   const [unit, setUnit] = useState<UnitKey>('mm');
   const [infill, setInfill] = useState(20);
-  const [wireframe, setWireframe] = useState(false);
   const [gridVisible, setGridVisible] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
-  const [modelColor, setModelColor] = useState(MATERIALS.pla.color);
+  const [modelColor, setModelColor] = useState(() => getThemeColor(MATERIALS.pla.colorToken));
 
   useEffect(() => {
     const host = viewerHostRef.current;
     if (!host) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#10172a');
+    scene.background = new THREE.Color(getThemeColor('--color-canvas'));
     const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100000);
     camera.position.set(80, 65, 105);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -165,16 +168,16 @@ export default function Home() {
     renderer.shadowMap.enabled = true;
     host.appendChild(renderer.domElement);
 
-    scene.add(new THREE.HemisphereLight('#dbeafe', '#111827', 2.1));
-    const keyLight = new THREE.DirectionalLight('#ffffff', 3.2);
+    scene.add(new THREE.HemisphereLight(getThemeColor('--color-info-soft'), getThemeColor('--color-grid-ground'), 2.1));
+    const keyLight = new THREE.DirectionalLight(getThemeColor('--color-white'), 3.2);
     keyLight.position.set(90, 120, 70);
     keyLight.castShadow = true;
     scene.add(keyLight);
-    const fillLight = new THREE.PointLight('#7dd3fc', 30, 500);
+    const fillLight = new THREE.PointLight(getThemeColor('--color-info'), 30, 500);
     fillLight.position.set(-90, 40, -80);
     scene.add(fillLight);
 
-    const grid = new THREE.GridHelper(160, 32, '#334155', '#1e293b');
+    const grid = new THREE.GridHelper(160, 32, getThemeColor('--color-grid-major'), getThemeColor('--color-grid-minor'));
     grid.position.y = -38;
     scene.add(grid);
 
@@ -228,8 +231,8 @@ export default function Home() {
   }, [autoRotate, gridVisible]);
 
   useEffect(() => {
-    if (modelRef.current) applyModelStyle(modelRef.current, modelColor, wireframe);
-  }, [modelColor, wireframe]);
+    if (modelRef.current) applyModelStyle(modelRef.current, modelColor);
+  }, [modelColor]);
 
   const fitModel = () => {
     const model = modelRef.current;
@@ -244,7 +247,8 @@ export default function Home() {
     camera.near = Math.max(maxSize / 10000, 0.001);
     camera.far = Math.max(maxSize * 100, 1000);
     camera.updateProjectionMatrix();
-    controls.target.set(0, 0, 0);
+    const modelCenter = box.getCenter(new THREE.Vector3());
+    controls.target.copy(modelCenter);
     controls.saveState();
     if (gridRef.current) gridRef.current.scale.setScalar(Math.max(1, maxSize / 70));
   };
@@ -270,7 +274,9 @@ export default function Home() {
       model.rotation.x = -Math.PI / 2;
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
-      model.position.sub(center);
+      model.position.x -= center.x;
+      model.position.z -= center.z;
+      model.position.y -= box.min.y;
       const dimensionsMm = box.getSize(new THREE.Vector3());
       const { volumeMm3, triangleCount } = calculateVolumeAndTriangles(model);
 
@@ -280,7 +286,7 @@ export default function Home() {
       }
       modelRef.current = model;
       sceneRef.current?.add(model);
-      applyModelStyle(model, modelColor, wireframe);
+      applyModelStyle(model, modelColor);
       setMetadata({ fileName: file.name, fileSize: file.size, format, dimensionsMm, volumeMm3, triangleCount });
       setViewerState('ready');
       requestAnimationFrame(fitModel);
@@ -350,7 +356,6 @@ export default function Home() {
             <div className="toolbar-group">
               <button className={`tool-button ${autoRotate ? 'active' : ''}`} onClick={() => setAutoRotate((value) => !value)} aria-pressed={autoRotate}>◌ دوران تلقائي</button>
               <button className={`tool-button ${gridVisible ? 'active' : ''}`} onClick={() => setGridVisible((value) => !value)} aria-pressed={gridVisible}>▦ الشبكة</button>
-              <button className={`tool-button ${wireframe ? 'active' : ''}`} onClick={() => setWireframe((value) => !value)} aria-pressed={wireframe}>⌗ Wireframe</button>
             </div>
             <span className="viewer-tip">تجربة محلية وآمنة</span>
           </div>
@@ -405,7 +410,7 @@ export default function Home() {
           <section className="pricing-card">
             <div className="section-heading"><span>تقدير التكلفة</span><span className="estimate-badge">مبدئي</span></div>
             <div className="pricing-controls">
-              <label>الخامة<select value={materialKey} onChange={(event) => { const next = event.target.value as MaterialKey; setMaterialKey(next); setModelColor(MATERIALS[next].color); }}><option value="pla">PLA · عملي وخفيف</option><option value="petg">PETG · أقوى ومتين</option></select></label>
+              <label>الخامة<select value={materialKey} onChange={(event) => { const next = event.target.value as MaterialKey; setMaterialKey(next); setModelColor(getThemeColor(MATERIALS[next].colorToken)); }}><option value="pla">PLA · عملي وخفيف</option><option value="petg">PETG · أقوى ومتين</option></select></label>
               <label>الامتلاء <output>{infill}%</output><input type="range" min="10" max="100" step="5" value={infill} onChange={(event) => setInfill(Number(event.target.value))} /></label>
             </div>
             <div className="price-result">
