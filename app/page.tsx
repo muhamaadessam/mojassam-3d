@@ -81,14 +81,13 @@ function disposeObject(object: THREE.Object3D) {
   });
 }
 
-function applyModelStyle(object: THREE.Object3D, color: string, wireframe: boolean) {
+function applyModelStyle(object: THREE.Object3D, color: string) {
   object.traverse((child) => {
     const mesh = child as THREE.Mesh;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     materials.filter(Boolean).forEach((material) => {
       const modelMaterial = material as THREE.MeshStandardMaterial;
       if (modelMaterial.color) modelMaterial.color.set(color);
-      if ('wireframe' in modelMaterial) modelMaterial.wireframe = wireframe;
       modelMaterial.needsUpdate = true;
     });
   });
@@ -151,7 +150,6 @@ export default function Home() {
   const [materialKey, setMaterialKey] = useState<MaterialKey>('pla');
   const [unit, setUnit] = useState<UnitKey>('mm');
   const [infill, setInfill] = useState(20);
-  const [wireframe, setWireframe] = useState(false);
   const [gridVisible, setGridVisible] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
   const [modelColor, setModelColor] = useState(() => getThemeColor(MATERIALS.pla.colorToken));
@@ -180,7 +178,7 @@ export default function Home() {
     scene.add(fillLight);
 
     const grid = new THREE.GridHelper(160, 32, getThemeColor('--color-grid-major'), getThemeColor('--color-grid-minor'));
-    grid.position.y = -38;
+    grid.position.y = 0;
     scene.add(grid);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -233,8 +231,8 @@ export default function Home() {
   }, [autoRotate, gridVisible]);
 
   useEffect(() => {
-    if (modelRef.current) applyModelStyle(modelRef.current, modelColor, wireframe);
-  }, [modelColor, wireframe]);
+    if (modelRef.current) applyModelStyle(modelRef.current, modelColor);
+  }, [modelColor]);
 
   const fitModel = () => {
     const model = modelRef.current;
@@ -249,7 +247,8 @@ export default function Home() {
     camera.near = Math.max(maxSize / 10000, 0.001);
     camera.far = Math.max(maxSize * 100, 1000);
     camera.updateProjectionMatrix();
-    controls.target.set(0, 0, 0);
+    const modelCenter = box.getCenter(new THREE.Vector3());
+    controls.target.copy(modelCenter);
     controls.saveState();
     if (gridRef.current) gridRef.current.scale.setScalar(Math.max(1, maxSize / 70));
   };
@@ -275,7 +274,9 @@ export default function Home() {
       model.rotation.x = -Math.PI / 2;
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
-      model.position.sub(center);
+      model.position.x -= center.x;
+      model.position.z -= center.z;
+      model.position.y -= box.min.y;
       const dimensionsMm = box.getSize(new THREE.Vector3());
       const { volumeMm3, triangleCount } = calculateVolumeAndTriangles(model);
 
@@ -285,7 +286,7 @@ export default function Home() {
       }
       modelRef.current = model;
       sceneRef.current?.add(model);
-      applyModelStyle(model, modelColor, wireframe);
+      applyModelStyle(model, modelColor);
       setMetadata({ fileName: file.name, fileSize: file.size, format, dimensionsMm, volumeMm3, triangleCount });
       setViewerState('ready');
       requestAnimationFrame(fitModel);
@@ -355,7 +356,6 @@ export default function Home() {
             <div className="toolbar-group">
               <button className={`tool-button ${autoRotate ? 'active' : ''}`} onClick={() => setAutoRotate((value) => !value)} aria-pressed={autoRotate}>◌ دوران تلقائي</button>
               <button className={`tool-button ${gridVisible ? 'active' : ''}`} onClick={() => setGridVisible((value) => !value)} aria-pressed={gridVisible}>▦ الشبكة</button>
-              <button className={`tool-button ${wireframe ? 'active' : ''}`} onClick={() => setWireframe((value) => !value)} aria-pressed={wireframe}>⌗ Wireframe</button>
             </div>
             <span className="viewer-tip">تجربة محلية وآمنة</span>
           </div>
