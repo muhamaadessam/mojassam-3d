@@ -21,9 +21,12 @@ type ReadyDesign = {
   descriptionEn: string;
   categoryAr: string;
   categoryEn: string;
+  material: MaterialKey;
+  infill: number;
   weightGrams: number;
   printHours: number;
   artClass: string;
+  image?: string;
 };
 
 type ModelMetadata = {
@@ -59,9 +62,9 @@ const PRINT_COLORS: PrintColor[] = [
   { id: 'pink', ar: 'وردي', en: 'Pink', hex: '#ef8fb5' },
 ];
 const READY_DESIGNS: ReadyDesign[] = [
-  { id: 'desk-organizer', nameAr: 'منظّم مكتب', nameEn: 'Desk organizer', descriptionAr: 'خانات عملية للأقلام والكروت.', descriptionEn: 'Practical slots for pens and cards.', categoryAr: 'مكتب', categoryEn: 'Desk', weightGrams: 72, printHours: 2.5, artClass: 'organizer' },
-  { id: 'wave-vase', nameAr: 'مزهرية الموجة', nameEn: 'Wave vase', descriptionAr: 'شكل هادئ يضيف لمسة للمكان.', descriptionEn: 'A calm form that adds character to a room.', categoryAr: 'ديكور', categoryEn: 'Decor', weightGrams: 118, printHours: 4, artClass: 'vase' },
-  { id: 'phone-stand', nameAr: 'حامل موبايل', nameEn: 'Phone stand', descriptionAr: 'حامل ثابت للمكتب أو بجانب السرير.', descriptionEn: 'A stable stand for your desk or bedside.', categoryAr: 'إكسسوارات', categoryEn: 'Accessories', weightGrams: 54, printHours: 1.75, artClass: 'stand' },
+  { id: 'desk-organizer', nameAr: 'منظّم مكتب', nameEn: 'Desk organizer', descriptionAr: 'خانات عملية للأقلام والكروت.', descriptionEn: 'Practical slots for pens and cards.', categoryAr: 'مكتب', categoryEn: 'Desk', material: 'pla', infill: 20, weightGrams: 72, printHours: 2.5, artClass: 'organizer' },
+  { id: 'wave-vase', nameAr: 'مزهرية الموجة', nameEn: 'Wave vase', descriptionAr: 'شكل هادئ يضيف لمسة للمكان.', descriptionEn: 'A calm form that adds character to a room.', categoryAr: 'ديكور', categoryEn: 'Decor', material: 'petg', infill: 15, weightGrams: 118, printHours: 4, artClass: 'vase' },
+  { id: 'phone-stand', nameAr: 'حامل موبايل', nameEn: 'Phone stand', descriptionAr: 'حامل ثابت للمكتب أو بجانب السرير.', descriptionEn: 'A stable stand for your desk or bedside.', categoryAr: 'إكسسوارات', categoryEn: 'Accessories', material: 'pla', infill: 25, weightGrams: 54, printHours: 1.75, artClass: 'stand' },
 ];
 const COPY = {
   ar: {
@@ -102,7 +105,8 @@ const COPY = {
     petg: 'PETG · أقوى ومتين',
     infill: 'الامتلاء',
     printColor: 'لون الطباعة',
-    printHours: 'ساعات التشغيل',
+    printHours: 'التشغيل المتوقع',
+    autoCalculated: 'محسوبة تلقائيًا',
     hourlyRate: (rate: string) => `${rate} ج.م / ساعة`,
     materialCost: 'الخامة',
     machineCost: 'تشغيل المكنة',
@@ -110,7 +114,7 @@ const COPY = {
     approxPrice: 'السعر التقريبي',
     weightDetails: (weight: string, rate: string) => `وزن متوقع ${weight} جم · سعر ${rate} ج.م/جم`,
     noEstimate: 'ارفع ملفًا مغلقًا وقابلًا للحساب لإظهار التقدير',
-    estimateNote: 'التقدير يعتمد على الحجم والامتلاء فقط، وليس عرض سعر نهائيًا.',
+    estimateNote: 'الساعات تقديرية من الحجم والامتلاء فقط؛ الحساب الدقيق يحتاج Slicer.',
     privacyTitle: 'خصوصيتك أولًا',
     privacyBody: 'الملف لا يغادر جهازك ولا يتم حفظه على أي سيرفر.',
     footer: 'مصمم للمعاينة السريعة قبل الطباعة',
@@ -167,7 +171,8 @@ const COPY = {
     petg: 'PETG · stronger and durable',
     infill: 'Infill',
     printColor: 'Print color',
-    printHours: 'Machine hours',
+    printHours: 'Estimated run time',
+    autoCalculated: 'Calculated automatically',
     hourlyRate: (rate: string) => `${rate} EGP / hour`,
     materialCost: 'Material',
     machineCost: 'Machine time',
@@ -175,7 +180,7 @@ const COPY = {
     approxPrice: 'Estimated price',
     weightDetails: (weight: string, rate: string) => `Expected weight ${weight} g · Rate ${rate} EGP/g`,
     noEstimate: 'Upload a closed, measurable file to show an estimate',
-    estimateNote: 'This estimate uses volume and infill only; it is not a final quote.',
+    estimateNote: 'Hours are estimated from volume and infill; exact timing needs a slicer.',
     privacyTitle: 'Privacy first',
     privacyBody: 'Your file never leaves your device or gets saved to a server.',
     footer: 'Built for quick checks before printing',
@@ -217,7 +222,14 @@ function formatNumber(value: number, digits = 1) {
 }
 
 function getReadyPrice(design: ReadyDesign) {
-  return design.weightGrams * MATERIALS.pla.rate + design.printHours * MACHINE_HOURLY_RATE;
+  return design.weightGrams * MATERIALS[design.material].rate + design.printHours * MACHINE_HOURLY_RATE;
+}
+
+function estimateMachineHours(volumeCm3: number, dimensionsMm: THREE.Vector3, infill: number) {
+  const largestDimension = Math.max(dimensionsMm.x, dimensionsMm.y, dimensionsMm.z);
+  const sizeFactor = Math.max(1, largestDimension / 100);
+  const infillFactor = 0.7 + infill / 100;
+  return Math.max(0.25, 0.25 + (volumeCm3 / 14) * sizeFactor * infillFactor);
 }
 
 function parseModel(file: File, format: SupportedFormat) {
@@ -315,7 +327,6 @@ export default function Home() {
   const [materialKey, setMaterialKey] = useState<MaterialKey>('pla');
   const [unit, setUnit] = useState<UnitKey>('mm');
   const [infill, setInfill] = useState(20);
-  const [printHours, setPrintHours] = useState(2);
   const [printColor, setPrintColor] = useState<PrintColor>(PRINT_COLORS[0]);
   const [orderDesign, setOrderDesign] = useState<ReadyDesign | null>(null);
   const [orderNotice, setOrderNotice] = useState('');
@@ -493,8 +504,9 @@ export default function Home() {
   const effectiveFraction = Math.min(1, 0.15 + (infill / 100) * 0.85);
   const estimatedWeight = volumeCm3 ? volumeCm3 * selectedMaterial.density * effectiveFraction : null;
   const materialCost = estimatedWeight ? estimatedWeight * selectedMaterial.rate : null;
-  const machineCost = printHours * MACHINE_HOURLY_RATE;
-  const estimatedPrice = materialCost ? materialCost + machineCost : null;
+  const estimatedMachineHours = volumeCm3 && metadata?.dimensionsMm ? estimateMachineHours(volumeCm3, metadata.dimensionsMm, infill) : null;
+  const machineCost = estimatedMachineHours ? estimatedMachineHours * MACHINE_HOURLY_RATE : null;
+  const estimatedPrice = materialCost !== null && machineCost !== null ? materialCost + machineCost : null;
 
   return (
     <main className="app-shell">
@@ -597,7 +609,7 @@ export default function Home() {
             <div className="pricing-controls">
               <label>{text.material}<select value={materialKey} onChange={(event) => setMaterialKey(event.target.value as MaterialKey)}><option value="pla">{text.pla}</option><option value="petg">{text.petg}</option></select></label>
               <label>{text.infill} <output>{infill}%</output><input type="range" min="10" max="100" step="5" value={infill} onChange={(event) => setInfill(Number(event.target.value))} /></label>
-              <label>{text.printHours}<output>{formatNumber(printHours, 2)}</output><input type="number" min="0.5" max="999" step="0.25" value={printHours} onChange={(event) => setPrintHours(Math.max(0.5, Number(event.target.value) || 0.5))} /></label>
+              <label className="auto-hours"><span>{text.printHours}</span><output>{estimatedMachineHours ? `${formatNumber(estimatedMachineHours, 2)} ${language === 'ar' ? 'ساعة' : 'h'}` : '—'}</output></label>
             </div>
             <div className="color-picker">
               <span>{text.printColor}</span>
@@ -620,7 +632,7 @@ export default function Home() {
               <strong>{estimatedPrice ? <>{formatNumber(estimatedPrice)} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></> : '—'}</strong>
               <div className="cost-breakdown">
                 <span>{text.materialCost}<b>{materialCost ? `${formatNumber(materialCost)} ${language === 'ar' ? 'ج.م' : 'EGP'}` : '—'}</b></span>
-                <span>{text.machineCost}<b>{formatNumber(machineCost)} {language === 'ar' ? 'ج.م' : 'EGP'}</b></span>
+                <span>{text.machineCost}<b>{machineCost ? `${formatNumber(machineCost)} ${language === 'ar' ? 'ج.م' : 'EGP'}` : '—'}</b></span>
               </div>
               <p>{estimatedWeight ? text.weightDetails(formatNumber(estimatedWeight, 1), formatNumber(selectedMaterial.rate, 0)) : text.noEstimate}</p>
             </div>
@@ -643,12 +655,12 @@ export default function Home() {
         <div className="store-grid">
           {READY_DESIGNS.map((design) => (
             <article className="store-card" key={design.id}>
-              <div className={`product-art ${design.artClass}`} aria-hidden="true"><span /></div>
+              {design.image ? <img className="product-image" src={design.image} alt={language === 'ar' ? design.nameAr : design.nameEn} /> : <div className={`product-art ${design.artClass}`} aria-hidden="true"><span /></div>}
               <div className="store-card-body">
                 <div className="store-card-meta"><span>{language === 'ar' ? design.categoryAr : design.categoryEn}</span><span>{text.readyTag}</span></div>
                 <h3>{language === 'ar' ? design.nameAr : design.nameEn}</h3>
                 <p>{language === 'ar' ? design.descriptionAr : design.descriptionEn}</p>
-                <div className="product-specs"><span>{formatNumber(design.weightGrams, 0)} {language === 'ar' ? 'جم' : 'g'}</span><span>{formatNumber(design.printHours, 2)} {language === 'ar' ? 'ساعة' : 'h'}</span></div>
+                <div className="product-specs"><span>{MATERIALS[design.material].label}</span><span>{text.infill}: {formatNumber(design.infill, 0)}%</span><span>{formatNumber(design.weightGrams, 0)} {language === 'ar' ? 'جم' : 'g'}</span><span>{formatNumber(design.printHours, 2)} {language === 'ar' ? 'ساعة' : 'h'}</span></div>
                 <div className="store-card-footer"><strong>{formatNumber(getReadyPrice(design))} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></strong><button className="tool-button" onClick={() => { setOrderDesign(design); setOrderNotice(text.orderAdded); }}>{text.addToOrder}</button></div>
               </div>
             </article>
