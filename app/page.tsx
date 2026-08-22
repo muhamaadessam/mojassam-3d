@@ -415,7 +415,7 @@ export default function Home() {
             </div>
             <div className="price-result">
               <span>السعر التقريبي</span>
-              <strong>{estimatedPrice ? `${formatNumber(estimatedPrice)} <small>ج.م</small>` : '—'}</strong>
+              <strong>{estimatedPrice ? <>{formatNumber(estimatedPrice)} <small>ج.م</small></> : '—'}</strong>
               <p>{estimatedWeight ? `وزن متوقع ${formatNumber(estimatedWeight, 1)} جم · سعر ${selectedMaterial.rate} ج.م/جم` : 'ارفع ملفًا مغلقًا وقابلًا للحساب لإظهار التقدير'}</p>
             </div>
             <p className="fine-print">التقدير يعتمد على الحجم والامتلاء فقط، وليس عرض سعر نهائيًا.</p>
