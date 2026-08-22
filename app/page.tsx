@@ -178,7 +178,7 @@ export default function Home() {
     scene.add(fillLight);
 
     const grid = new THREE.GridHelper(160, 32, getThemeColor('--color-grid-major'), getThemeColor('--color-grid-minor'));
-    grid.position.y = -38;
+    grid.position.y = 0;
     scene.add(grid);
 
     const controls = new OrbitControls(camera, renderer.domElement);
