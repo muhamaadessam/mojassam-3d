@@ -13,3 +13,14 @@ FORM: Operate / workbench split view; original composition with a deliberately q
 - Use system sans typography and Arabic-first copy; technical formats and units can remain Latin.
 - Motion belongs to the model and camera: orbit, damping, auto-rotate, and fit-to-view. UI motion stays minimal.
 - Every estimate must be labeled preliminary and must not imply slicer accuracy.
+
+## Theme editing
+
+All color decisions live in `app/design-tokens.css`. Change the semantic tokens there first; both the UI and the WebGL scene read from the same CSS variables. Keep component CSS on semantic names such as `--color-brand`, `--color-surface`, and `--color-text-muted`, not raw hex values.
+
+- `--color-brand`: primary action, selected state, and PLA preview.
+- `--color-info`: PETG preview and cool scene light.
+- `--color-page` / `--color-canvas`: app background and 3D stage.
+- `--color-surface` / `--color-surface-raised`: panels and controls.
+- `--color-text-*` / `--color-border*`: text hierarchy and dividers.
+- `--color-danger*`: file parsing and validation errors.
