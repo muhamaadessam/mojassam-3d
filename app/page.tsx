@@ -11,6 +11,7 @@ type SupportedFormat = 'stl' | 'obj' | '3mf';
 type ViewerState = 'idle' | 'loading' | 'ready' | 'error';
 type MaterialKey = 'pla' | 'petg';
 type UnitKey = 'mm' | 'cm' | 'in';
+type LanguageKey = 'ar' | 'en';
 
 type ModelMetadata = {
   format: SupportedFormat;
@@ -35,6 +36,102 @@ const MATERIALS: Record<MaterialKey, PricingConfig> = {
 };
 const UNIT_FACTORS: Record<UnitKey, number> = { mm: 1, cm: 0.1, in: 1 / 25.4 };
 const UNIT_LABELS: Record<UnitKey, string> = { mm: 'mm', cm: 'cm', in: 'in' };
+const COPY = {
+  ar: {
+    language: 'English',
+    privacyStatus: 'الملف يفضل على جهازك',
+    upload: '+ رفع ملف',
+    noFile: 'لم يتم اختيار تصميم بعد',
+    reset: 'إعادة ضبط العرض',
+    loadingTitle: 'بنجهز المعاينة…',
+    idleTitle: 'ارفع تصميمك وابدأ',
+    loadingBody: 'ثواني ونظهر المجسم هنا.',
+    idleBody: 'اسحب ملفك هنا أو استخدم زر الرفع.',
+    fileLimit: 'STL · OBJ · 3MF / حتى 50MB',
+    stageHint: 'اسحب للتدوير · عجلة الماوس للتكبير · زر يمين للتحريك',
+    autoRotate: '◌ دوران تلقائي',
+    grid: '▦ الشبكة',
+    localSafe: 'تجربة محلية وآمنة',
+    start: 'ابدأ من هنا',
+    heroLine1: 'شوف تصميمك',
+    heroLine2: 'قبل ما تطبعه.',
+    intro: 'عاين التفاصيل، افهم الحجم، وخد فكرة عن التكلفة في مساحة واحدة.',
+    dropTitle: 'اسحب الملف هنا',
+    dropSubtitle: 'أو اضغط لاختيار ملف من جهازك',
+    designData: 'بيانات التصميم',
+    fileSize: 'الحجم',
+    triangles: 'المثلثات',
+    dimensions: 'الأبعاد',
+    unit: 'وحدة القياس',
+    mm: 'ميليمتر (mm)',
+    cm: 'سنتيمتر (cm)',
+    inches: 'بوصة (in)',
+    estimate: 'تقدير التكلفة',
+    preliminary: 'مبدئي',
+    material: 'الخامة',
+    pla: 'PLA · عملي وخفيف',
+    petg: 'PETG · أقوى ومتين',
+    infill: 'الامتلاء',
+    approxPrice: 'السعر التقريبي',
+    weightDetails: (weight: string, rate: string) => `وزن متوقع ${weight} جم · سعر ${rate} ج.م/جم`,
+    noEstimate: 'ارفع ملفًا مغلقًا وقابلًا للحساب لإظهار التقدير',
+    estimateNote: 'التقدير يعتمد على الحجم والامتلاء فقط، وليس عرض سعر نهائيًا.',
+    privacyTitle: 'خصوصيتك أولًا',
+    privacyBody: 'الملف لا يغادر جهازك ولا يتم حفظه على أي سيرفر.',
+    footer: 'مصمم للمعاينة السريعة قبل الطباعة',
+    unsupported: 'الصيغة غير مدعومة. ارفع STL أو OBJ أو 3MF.',
+    tooLarge: 'الملف أكبر من 50MB. جرّب تصدير نسخة أخف.',
+    parseError: 'لم نقدر نقرأ الملف. تأكد أنه ملف 3D سليم ثم جرّب مرة ثانية.',
+    fileClosed: 'ارفع ملفًا مغلقًا وقابلًا للحساب لإظهار التقدير',
+  },
+  en: {
+    language: 'العربية',
+    privacyStatus: 'Your file stays on your device',
+    upload: '+ Upload file',
+    noFile: 'No design selected yet',
+    reset: 'Reset view',
+    loadingTitle: 'Preparing preview…',
+    idleTitle: 'Upload your design',
+    loadingBody: 'We will show the model here in a moment.',
+    idleBody: 'Drop your file here or use the upload button.',
+    fileLimit: 'STL · OBJ · 3MF / up to 50MB',
+    stageHint: 'Drag to orbit · scroll to zoom · right-click to pan',
+    autoRotate: '◌ Auto-rotate',
+    grid: '▦ Grid',
+    localSafe: 'Private and local',
+    start: 'Start here',
+    heroLine1: 'See your design',
+    heroLine2: 'before you print it.',
+    intro: 'Inspect details, understand the size, and get a quick cost estimate in one place.',
+    dropTitle: 'Drop your file here',
+    dropSubtitle: 'or click to choose a file from your device',
+    designData: 'Design data',
+    fileSize: 'File size',
+    triangles: 'Triangles',
+    dimensions: 'Dimensions',
+    unit: 'Measurement unit',
+    mm: 'Millimeters (mm)',
+    cm: 'Centimeters (cm)',
+    inches: 'Inches (in)',
+    estimate: 'Cost estimate',
+    preliminary: 'Preliminary',
+    material: 'Material',
+    pla: 'PLA · practical and light',
+    petg: 'PETG · stronger and durable',
+    infill: 'Infill',
+    approxPrice: 'Estimated price',
+    weightDetails: (weight: string, rate: string) => `Expected weight ${weight} g · Rate ${rate} EGP/g`,
+    noEstimate: 'Upload a closed, measurable file to show an estimate',
+    estimateNote: 'This estimate uses volume and infill only; it is not a final quote.',
+    privacyTitle: 'Privacy first',
+    privacyBody: 'Your file never leaves your device or gets saved to a server.',
+    footer: 'Built for quick checks before printing',
+    unsupported: 'Unsupported format. Upload an STL, OBJ, or 3MF file.',
+    tooLarge: 'The file is larger than 50MB. Try exporting a lighter version.',
+    parseError: 'We could not read this file. Make sure it is a valid 3D file and try again.',
+    fileClosed: 'Upload a closed, measurable file to show an estimate',
+  },
+} as const;
 
 function getThemeColor(token: string) {
   if (typeof document === 'undefined') return '#ffffff';
@@ -53,7 +150,7 @@ function formatBytes(bytes: number) {
 }
 
 function formatNumber(value: number, digits = 1) {
-  return new Intl.NumberFormat('ar-EG', { maximumFractionDigits: digits }).format(value);
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(value);
 }
 
 function parseModel(file: File, format: SupportedFormat) {
@@ -147,12 +244,20 @@ export default function Home() {
   const [viewerState, setViewerState] = useState<ViewerState>('idle');
   const [metadata, setMetadata] = useState<ModelMetadata | null>(null);
   const [error, setError] = useState('');
+  const [language, setLanguage] = useState<LanguageKey>('ar');
   const [materialKey, setMaterialKey] = useState<MaterialKey>('pla');
   const [unit, setUnit] = useState<UnitKey>('mm');
   const [infill, setInfill] = useState(20);
   const [gridVisible, setGridVisible] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
   const [modelColor, setModelColor] = useState(() => getThemeColor(MATERIALS.pla.colorToken));
+  const text = COPY[language];
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.title = language === 'ar' ? '3D Preview — عاين تصميمك قبل الطباعة' : '3D Preview — Preview before you print';
+  }, [language]);
 
   useEffect(() => {
     const host = viewerHostRef.current;
@@ -257,12 +362,12 @@ export default function Home() {
     const format = getFormat(file.name);
     if (!format) {
       setViewerState('error');
-      setError('الصيغة غير مدعومة. ارفع STL أو OBJ أو 3MF.');
+      setError(text.unsupported);
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
       setViewerState('error');
-      setError('الملف أكبر من 50MB. جرّب تصدير نسخة أخف.');
+      setError(text.tooLarge);
       return;
     }
 
@@ -292,7 +397,7 @@ export default function Home() {
       requestAnimationFrame(fitModel);
     } catch {
       setViewerState('error');
-      setError('لم نقدر نقرأ الملف. تأكد أنه ملف 3D سليم ثم جرّب مرة ثانية.');
+      setError(text.parseError);
     }
   };
 
@@ -325,17 +430,20 @@ export default function Home() {
           <div className="brand-mark" aria-hidden="true">◎</div>
           <div><p className="eyebrow">3D WORKSPACE</p><h1>3D Preview</h1></div>
         </div>
-        <div className="topbar-note"><span className="online-dot" /> الملف يفضل على جهازك</div>
-        <button className="primary-button compact" onClick={() => fileInputRef.current?.click()}>+ رفع ملف</button>
+        <div className="topbar-note"><span className="online-dot" /> {text.privacyStatus}</div>
+        <div className="topbar-actions">
+          <button className="ghost-button language-button" onClick={() => setLanguage((value) => value === 'ar' ? 'en' : 'ar')} aria-label={text.language}>{text.language}</button>
+          <button className="primary-button compact" onClick={() => fileInputRef.current?.click()}>{text.upload}</button>
+        </div>
       </header>
 
       <div className="workspace">
-        <section className="viewer-card" aria-label="مساحة عرض التصميم ثلاثي الأبعاد">
+        <section className="viewer-card" aria-label={language === 'ar' ? 'مساحة عرض التصميم ثلاثي الأبعاد' : '3D design preview area'}>
           <div className="viewer-header">
-            <div><p className="eyebrow">LIVE PREVIEW</p><strong>{metadata?.fileName ?? 'لم يتم اختيار تصميم بعد'}</strong></div>
+            <div><p className="eyebrow">LIVE PREVIEW</p><strong>{metadata?.fileName ?? text.noFile}</strong></div>
             <div className="viewer-badges">
               <span className="soft-badge">{metadata ? metadata.format.toUpperCase() : 'STL · OBJ · 3MF'}</span>
-              <button className="ghost-button" onClick={resetCamera} disabled={!metadata}>إعادة ضبط العرض</button>
+              <button className="ghost-button" onClick={resetCamera} disabled={!metadata}>{text.reset}</button>
             </div>
           </div>
 
@@ -343,29 +451,29 @@ export default function Home() {
             {viewerState !== 'ready' && (
               <div className="stage-message" role="status" aria-live="polite">
                 <div className="upload-orb">↥</div>
-                <h2>{viewerState === 'loading' ? 'بنجهز المعاينة…' : 'ارفع تصميمك وابدأ'}</h2>
-                <p>{viewerState === 'loading' ? 'ثواني ونظهر المجسم هنا.' : 'اسحب ملفك هنا أو استخدم زر الرفع.'}</p>
-                {viewerState === 'idle' && <span className="format-note">STL · OBJ · 3MF / حتى 50MB</span>}
+                <h2>{viewerState === 'loading' ? text.loadingTitle : text.idleTitle}</h2>
+                <p>{viewerState === 'loading' ? text.loadingBody : text.idleBody}</p>
+                {viewerState === 'idle' && <span className="format-note">{text.fileLimit}</span>}
                 {viewerState === 'error' && <div className="error-message">{error}</div>}
               </div>
             )}
-            {viewerState === 'ready' && <div className="stage-hint">اسحب للتدوير · عجلة الماوس للتكبير · زر يمين للتحريك</div>}
+            {viewerState === 'ready' && <div className="stage-hint">{text.stageHint}</div>}
           </div>
 
           <div className="viewer-toolbar">
             <div className="toolbar-group">
-              <button className={`tool-button ${autoRotate ? 'active' : ''}`} onClick={() => setAutoRotate((value) => !value)} aria-pressed={autoRotate}>◌ دوران تلقائي</button>
-              <button className={`tool-button ${gridVisible ? 'active' : ''}`} onClick={() => setGridVisible((value) => !value)} aria-pressed={gridVisible}>▦ الشبكة</button>
+              <button className={`tool-button ${autoRotate ? 'active' : ''}`} onClick={() => setAutoRotate((value) => !value)} aria-pressed={autoRotate}>{text.autoRotate}</button>
+              <button className={`tool-button ${gridVisible ? 'active' : ''}`} onClick={() => setGridVisible((value) => !value)} aria-pressed={gridVisible}>{text.grid}</button>
             </div>
-            <span className="viewer-tip">تجربة محلية وآمنة</span>
+            <span className="viewer-tip">{text.localSafe}</span>
           </div>
         </section>
 
         <aside className="control-panel">
           <div className="panel-intro">
-            <p className="eyebrow accent">ابدأ من هنا</p>
-            <h2>شوف تصميمك<br />قبل ما تطبعه.</h2>
-            <p>عاين التفاصيل، افهم الحجم، وخد فكرة عن التكلفة في مساحة واحدة.</p>
+            <p className="eyebrow accent">{text.start}</p>
+            <h2>{text.heroLine1}<br />{text.heroLine2}</h2>
+            <p>{text.intro}</p>
           </div>
 
           <label
@@ -383,49 +491,49 @@ export default function Home() {
           >
             <input ref={fileInputRef} type="file" accept=".stl,.obj,.3mf" onChange={handleFileChange} />
             <span className="dropzone-icon">↥</span>
-            <span className="dropzone-title">اسحب الملف هنا</span>
-            <span className="dropzone-subtitle">أو اضغط لاختيار ملف من جهازك</span>
-            <span className="dropzone-formats">STL · OBJ · 3MF <i>حتى 50MB</i></span>
+            <span className="dropzone-title">{text.dropTitle}</span>
+            <span className="dropzone-subtitle">{text.dropSubtitle}</span>
+            <span className="dropzone-formats">STL · OBJ · 3MF <i>{language === 'ar' ? 'حتى 50MB' : 'up to 50MB'}</i></span>
           </label>
 
           {metadata && (
             <section className="info-section">
-              <div className="section-heading"><span>بيانات التصميم</span><span className="file-chip">.{metadata.format}</span></div>
+              <div className="section-heading"><span>{text.designData}</span><span className="file-chip">.{metadata.format}</span></div>
               <div className="stat-grid">
-                <div><span>الحجم</span><strong>{formatBytes(metadata.fileSize)}</strong></div>
-                <div><span>المثلثات</span><strong>{formatNumber(metadata.triangleCount, 0)}</strong></div>
-                <div className="wide-stat"><span>الأبعاد ({UNIT_LABELS[unit]})</span><strong>{dimensions}</strong></div>
+                <div><span>{text.fileSize}</span><strong>{formatBytes(metadata.fileSize)}</strong></div>
+                <div><span>{text.triangles}</span><strong>{formatNumber(metadata.triangleCount, 0)}</strong></div>
+                <div className="wide-stat"><span>{text.dimensions} ({UNIT_LABELS[unit]})</span><strong>{dimensions}</strong></div>
               </div>
               <div className="control-row">
-                <label htmlFor="unit">وحدة القياس</label>
+                <label htmlFor="unit">{text.unit}</label>
                 <select id="unit" value={unit} onChange={(event) => setUnit(event.target.value as UnitKey)}>
-                  <option value="mm">ميليمتر (mm)</option>
-                  <option value="cm">سنتيمتر (cm)</option>
-                  <option value="in">بوصة (in)</option>
+                  <option value="mm">{text.mm}</option>
+                  <option value="cm">{text.cm}</option>
+                  <option value="in">{text.inches}</option>
                 </select>
               </div>
             </section>
           )}
 
           <section className="pricing-card">
-            <div className="section-heading"><span>تقدير التكلفة</span><span className="estimate-badge">مبدئي</span></div>
+            <div className="section-heading"><span>{text.estimate}</span><span className="estimate-badge">{text.preliminary}</span></div>
             <div className="pricing-controls">
-              <label>الخامة<select value={materialKey} onChange={(event) => { const next = event.target.value as MaterialKey; setMaterialKey(next); setModelColor(getThemeColor(MATERIALS[next].colorToken)); }}><option value="pla">PLA · عملي وخفيف</option><option value="petg">PETG · أقوى ومتين</option></select></label>
-              <label>الامتلاء <output>{infill}%</output><input type="range" min="10" max="100" step="5" value={infill} onChange={(event) => setInfill(Number(event.target.value))} /></label>
+              <label>{text.material}<select value={materialKey} onChange={(event) => { const next = event.target.value as MaterialKey; setMaterialKey(next); setModelColor(getThemeColor(MATERIALS[next].colorToken)); }}><option value="pla">{text.pla}</option><option value="petg">{text.petg}</option></select></label>
+              <label>{text.infill} <output>{infill}%</output><input type="range" min="10" max="100" step="5" value={infill} onChange={(event) => setInfill(Number(event.target.value))} /></label>
             </div>
             <div className="price-result">
-              <span>السعر التقريبي</span>
-              <strong>{estimatedPrice ? <>{formatNumber(estimatedPrice)} <small>ج.م</small></> : '—'}</strong>
-              <p>{estimatedWeight ? `وزن متوقع ${formatNumber(estimatedWeight, 1)} جم · سعر ${selectedMaterial.rate} ج.م/جم` : 'ارفع ملفًا مغلقًا وقابلًا للحساب لإظهار التقدير'}</p>
+              <span>{text.approxPrice}</span>
+              <strong>{estimatedPrice ? <>{formatNumber(estimatedPrice)} <small>{language === 'ar' ? 'ج.م' : 'EGP'}</small></> : '—'}</strong>
+              <p>{estimatedWeight ? text.weightDetails(formatNumber(estimatedWeight, 1), formatNumber(selectedMaterial.rate, 0)) : text.noEstimate}</p>
             </div>
-            <p className="fine-print">التقدير يعتمد على الحجم والامتلاء فقط، وليس عرض سعر نهائيًا.</p>
+            <p className="fine-print">{text.estimateNote}</p>
           </section>
 
-          <div className="privacy-note"><span>◉</span><p><strong>خصوصيتك أولًا</strong><br />الملف لا يغادر جهازك ولا يتم حفظه على أي سيرفر.</p></div>
+          <div className="privacy-note"><span>◉</span><p><strong>{text.privacyTitle}</strong><br />{text.privacyBody}</p></div>
         </aside>
       </div>
 
-      <footer className="footer-note"><span>3D Preview / v1</span><span>مصمم للمعاينة السريعة قبل الطباعة</span></footer>
+      <footer className="footer-note"><span>3D Preview / v1</span><span>{text.footer}</span></footer>
     </main>
   );
 }
