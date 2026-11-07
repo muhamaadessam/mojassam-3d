@@ -48,6 +48,19 @@ rm -rf "$release/.health-data"
 
 previous=$(readlink "$releases/current" || true)
 if [[ ! -f $releases/original-server.cjs ]]; then cp "$app/server.cjs" "$releases/original-server.cjs"; fi
+rollback() {
+  if [[ -n $previous ]]; then
+    ln -s "$previous" "$releases/current.rollback"
+    mv -Tf "$releases/current.rollback" "$releases/current"
+  else
+    cp "$releases/original-server.cjs" "$app/server.cjs"
+  fi
+  mkdir -p "$app/tmp"
+  touch "$app/tmp/restart.txt"
+  printf 'Deployment failed; restored the previous release\n' >&2
+}
+trap rollback EXIT
+trap 'exit 1' HUP INT TERM
 ln -s "$release" "$releases/current.next"
 mv -Tf "$releases/current.next" "$releases/current"
 cat > "$app/server.cjs.next" <<'STARTUP'
@@ -62,19 +75,12 @@ touch "$app/tmp/restart.txt"
 
 for attempt in $(seq 1 30); do
   if health "$origin/api/health?release=$sha" "$sha" 2>/dev/null; then
+    trap - EXIT HUP INT TERM
     printf 'Deployed %s\n' "$sha"
     exit 0
   fi
   sleep 2
 done
 
-# Restore the previous startup target when the live release fails its health check.
-if [[ -n $previous ]]; then
-  ln -s "$previous" "$releases/current.rollback"
-  mv -Tf "$releases/current.rollback" "$releases/current"
-else
-  cp "$releases/original-server.cjs" "$app/server.cjs"
-fi
-touch "$app/tmp/restart.txt"
-printf 'Live health check failed; restored the previous release\n' >&2
+printf 'Live health check failed\n' >&2
 exit 1

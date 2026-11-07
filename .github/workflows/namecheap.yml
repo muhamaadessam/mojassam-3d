@@ -65,6 +65,4 @@ jobs:
           chmod 600 "$RUNNER_TEMP/ssh/key" "$RUNNER_TEMP/ssh/known_hosts"
           trap 'rm -f "$RUNNER_TEMP/ssh/key"' EXIT
           ssh_options=(-i "$RUNNER_TEMP/ssh/key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o ConnectTimeout=20)
-          ssh "${ssh_options[@]}" -p 21098 konobbue@server144.web-hosting.com 'mkdir -p /home/konobbue/mojassam-releases'
-          scp "${ssh_options[@]}" -P 21098 "$RUNNER_TEMP/release.tar.gz" "konobbue@server144.web-hosting.com:/home/konobbue/mojassam-releases/$GITHUB_SHA.tar.gz"
-          ssh "${ssh_options[@]}" -p 21098 konobbue@server144.web-hosting.com "bash -s -- $GITHUB_SHA" < scripts/deploy-namecheap.sh
+          ssh "${ssh_options[@]}" -p 21098 konobbue@server144.web-hosting.com "$GITHUB_SHA" < "$RUNNER_TEMP/release.tar.gz"
