@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: 'حسابي', robots: { index: false,
 
 export default async function AccountPage() {
   const user = await getUser();
-  if (!user) redirect('/login');
+  if (!user) redirect('/login?next=/account');
   const language: LanguageKey = (await cookies()).get(LANGUAGE_COOKIE)?.value === 'en' ? 'en' : 'ar';
   const text = ACCOUNT_COPY[language];
   const displayName = `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0];
