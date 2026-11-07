@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -9,6 +10,8 @@ import { listOrders } from '@/lib/orders';
 import DocumentLanguage from './document-language';
 import SignOutButton from './sign-out-button';
 import ProfileForm from './profile-form';
+
+export const metadata: Metadata = { title: 'حسابي', robots: { index: false, follow: false } };
 
 export default async function AccountPage() {
   const user = await getUser();

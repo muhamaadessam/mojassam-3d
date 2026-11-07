@@ -131,7 +131,7 @@ export default function StudioPage() {
   const text = COPY[language];
 
   useEffect(() => {
-    document.title = language === 'ar' ? 'Mojassam 3D — عاين تصميمك قبل الطباعة' : 'Mojassam 3D — Preview before you print';
+    document.title = language === 'ar' ? 'استوديو المعاينة وحساب تكلفة الطباعة 3D | Mojassam 3D' : '3D preview & print-cost studio | Mojassam 3D';
   }, [language]);
 
   useEffect(() => {
@@ -363,7 +363,7 @@ export default function StudioPage() {
         <aside className="control-panel">
           <div className="panel-intro">
             <p className="eyebrow accent">{text.start}</p>
-            <h2>{text.heroLine1}<br />{text.heroLine2}</h2>
+            <h1>{text.heroLine1}<br />{text.heroLine2}</h1>
             <p>{text.intro}</p>
           </div>
 

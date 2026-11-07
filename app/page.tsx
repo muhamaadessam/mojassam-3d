@@ -9,6 +9,9 @@ import { COPY, type FileErrorKey } from '@/lib/copy';
 import { useLanguage } from '@/lib/language';
 import { formatBytes, formatNumber, validateModelFile } from '@/lib/model-file';
 import { savePendingFile } from '@/lib/pending-file';
+import { FAQ, homeJsonLd, SITE_TITLE_AR } from '@/lib/site';
+
+const JSON_LD = JSON.stringify(homeJsonLd()).replace(/</g, '\\u003c');
 
 type OrderState = 'idle' | 'added' | 'saving' | 'saved' | 'login' | 'failed';
 
@@ -25,7 +28,7 @@ export default function Home() {
   const name = (design: ReadyDesign) => language === 'ar' ? design.nameAr : design.nameEn;
 
   useEffect(() => {
-    document.title = language === 'ar' ? 'Mojassam 3D — ابدأ طباعتك' : 'Mojassam 3D — Start your print';
+    document.title = language === 'ar' ? SITE_TITLE_AR : 'Mojassam 3D — 3D file preview & 3D-printing cost estimate';
   }, [language]);
 
   const chooseFile = async (file?: File) => {
@@ -71,6 +74,7 @@ export default function Home() {
 
   return (
     <main className="home-shell">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON_LD }} />
       <SiteHeader
         language={language}
         text={text}
@@ -81,7 +85,7 @@ export default function Home() {
       <section className="home-hero">
         <div className="home-copy">
           <p className="eyebrow accent">{text.start}</p>
-          <h2>{text.heroLine1}<br />{text.heroLine2}</h2>
+          <h1>{text.heroLine1}<br />{text.heroLine2}</h1>
           <p>{text.intro}</p>
         </div>
         <div className="home-upload-card">
@@ -167,6 +171,23 @@ export default function Home() {
           <button className="primary-button" disabled={!orderDesign || orderState === 'saving' || orderState === 'saved'} onClick={confirmReadyOrder}>{orderState === 'saving' ? text.orderSaving : text.confirmOrder}</button>
           {orderNotice && <span className="order-notice">{orderNotice}</span>}
         </section>
+      </section>
+
+      <section className="store-section faq-section" id="faq" aria-labelledby="faq-title">
+        <div className="store-header">
+          <div>
+            <p className="eyebrow accent" lang="en">FAQ</p>
+            <h2 id="faq-title">{language === 'ar' ? 'أسئلة شائعة عن الطباعة ثلاثية الأبعاد' : '3D printing FAQ'}</h2>
+          </div>
+        </div>
+        <div className="faq-list">
+          {FAQ[language].map(({ q, a }) => (
+            <details className="faq-item" key={q}>
+              <summary>{q}</summary>
+              <p>{a}</p>
+            </details>
+          ))}
+        </div>
       </section>
 
       <footer className="footer-note"><span>Mojassam 3D / v1</span><span>{text.footer}</span></footer>
