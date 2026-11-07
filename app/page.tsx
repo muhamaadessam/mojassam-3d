@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SiteHeader from '@/components/site-header';
+import { CheckIcon, ShieldIcon, UploadIcon } from '@/components/icons';
 import { getReadyPrice, MATERIALS, PRINT_COLORS, READY_DESIGNS, type PrintColor, type ReadyDesign } from '@/lib/catalog';
 import { COPY, type FileErrorKey } from '@/lib/copy';
 import { useLanguage } from '@/lib/language';
@@ -83,28 +84,35 @@ export default function Home() {
           <p className="eyebrow accent">{text.start}</p>
           <h2>{text.heroLine1}<br />{text.heroLine2}</h2>
           <p>{text.intro}</p>
-          <div className="home-proof"><span>01</span><span>{text.homeUploadBody}</span></div>
         </div>
         <div className="home-upload-card">
           <div className="upload-card-heading">
-            <div><p className="eyebrow">STUDIO ENTRY</p><h2>{text.homeUploadTitle}</h2></div>
-            <span className="upload-card-mark">↥</span>
+            <div><p className="eyebrow" lang="en">STUDIO ENTRY</p><h2>{text.homeUploadTitle}</h2></div>
+            <span className="upload-card-mark"><UploadIcon size={22} /></span>
           </div>
           <p className="home-upload-body">{text.homeUploadBody}</p>
           <label
             className={`home-dropzone ${selectedFile ? 'has-file' : ''}`}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => { event.preventDefault(); void chooseFile(event.dataTransfer.files?.[0]); }}
           >
             <input ref={fileInputRef} type="file" accept=".stl,.obj,.3mf" onChange={(event) => void chooseFile(event.target.files?.[0])} />
-            <span className="home-dropzone-icon">{selectedFile ? '✓' : '↥'}</span>
+            <span className="home-dropzone-icon">{selectedFile ? <CheckIcon size={26} /> : <UploadIcon size={26} />}</span>
             <strong>{selectedFile ? selectedFile.name : text.dropTitle}</strong>
             <span>{selectedFile ? `${formatBytes(selectedFile.size)} · ${text.selectedFile}` : text.dropSubtitle}</span>
             <small>STL · OBJ · 3MF <i>{language === 'ar' ? 'حتى 50MB' : 'up to 50MB'}</i></small>
           </label>
           {fileError && <p className="home-file-error" role="alert">{text[fileError]}</p>}
           <button className="primary-button home-upload-action" disabled={!selectedFile} onClick={() => router.push('/studio')}>{text.openStudio}</button>
-          <p className="home-local-note"><span>◉</span>{text.privacyBody}</p>
+          <p className="home-local-note"><ShieldIcon size={16} />{text.privacyBody}</p>
         </div>
       </section>
 

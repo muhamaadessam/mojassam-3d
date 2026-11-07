@@ -41,7 +41,7 @@ export default function LoginPage() {
           <Link className="auth-back" href="/">{text.backToPreview}</Link>
           <button type="button" className="ghost-button" onClick={toggleLanguage}>{text.language}</button>
         </div>
-        <p className="eyebrow accent">MOJASSAM 3D ACCOUNT</p>
+        <p className="eyebrow accent" lang="en">MOJASSAM 3D ACCOUNT</p>
         <h1>{mode === 'login' ? text.loginTitle : text.signupTitle}</h1>
         <p className="auth-intro">{text.authIntro}</p>
         <form className="auth-form" onSubmit={submit}>

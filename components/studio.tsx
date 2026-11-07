@@ -7,6 +7,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import SiteHeader from './site-header';
+import { ShieldIcon, UploadIcon } from './icons';
 import { estimateCustomPrint, MACHINE_HOURLY_RATE, MATERIALS, PRINT_COLORS, type MaterialKey, type PrintColor } from '@/lib/catalog';
 import { COPY, type FileErrorKey } from '@/lib/copy';
 import { formatBytes, formatNumber, getFormat, validateModelFile, type SupportedFormat } from '@/lib/model-file';
@@ -331,7 +332,7 @@ export default function StudioPage() {
       <div className="workspace" id="studio">
         <section className="viewer-card" aria-label={language === 'ar' ? 'مساحة عرض التصميم ثلاثي الأبعاد' : '3D design preview area'}>
           <div className="viewer-header">
-            <div><p className="eyebrow">LIVE PREVIEW</p><strong>{metadata?.fileName ?? text.noFile}</strong></div>
+            <div><p className="eyebrow" lang="en">LIVE PREVIEW</p><strong>{metadata?.fileName ?? text.noFile}</strong></div>
             <div className="viewer-badges">
               <span className="soft-badge">{metadata ? metadata.format.toUpperCase() : 'STL · OBJ · 3MF'}</span>
               <button className="ghost-button" onClick={() => controlsRef.current?.reset()} disabled={!metadata}>{text.reset}</button>
@@ -341,7 +342,7 @@ export default function StudioPage() {
           <div className="viewer-stage" ref={viewerHostRef}>
             {viewerState !== 'ready' && (
               <div className="stage-message" role="status" aria-live="polite">
-                <div className="upload-orb">↥</div>
+                <div className="upload-orb"><UploadIcon size={28} /></div>
                 <h2>{viewerState === 'loading' ? text.loadingTitle : text.idleTitle}</h2>
                 <p>{viewerState === 'loading' ? text.loadingBody : text.idleBody}</p>
                 {viewerState === 'idle' && <span className="format-note">{text.fileLimit}</span>}
@@ -381,7 +382,7 @@ export default function StudioPage() {
             onDrop={handleDrop}
           >
             <input ref={fileInputRef} type="file" accept=".stl,.obj,.3mf" onChange={handleFileChange} />
-            <span className="dropzone-icon">↥</span>
+            <span className="dropzone-icon"><UploadIcon size={18} /></span>
             <span className="dropzone-title">{text.dropTitle}</span>
             <span className="dropzone-subtitle">{text.dropSubtitle}</span>
             <span className="dropzone-formats">STL · OBJ · 3MF <i>{language === 'ar' ? 'حتى 50MB' : 'up to 50MB'}</i></span>
@@ -457,7 +458,7 @@ export default function StudioPage() {
             <p className="fine-print">{text.estimateNote} · {text.hourlyRate(formatNumber(MACHINE_HOURLY_RATE, 0))}</p>
           </section>
 
-          <div className="privacy-note"><span>◉</span><p><strong>{text.privacyTitle}</strong><br />{text.privacyBody}</p></div>
+          <div className="privacy-note"><ShieldIcon size={18} /><p><strong>{text.privacyTitle}</strong><br />{text.privacyBody}</p></div>
         </aside>
       </div>
 
