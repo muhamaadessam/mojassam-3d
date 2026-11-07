@@ -31,3 +31,13 @@ export async function readPendingFile() {
   database.close();
   return file;
 }
+
+export async function clearPendingFile() {
+  const database = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(FILE_KEY);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+  database.close();
+}

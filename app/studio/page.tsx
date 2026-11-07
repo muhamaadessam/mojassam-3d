@@ -1,3 +1,3 @@
-import { StudioPage } from '../page';
+import StudioPage from '@/components/studio';
 
 export default StudioPage;

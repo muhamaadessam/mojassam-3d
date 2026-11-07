@@ -1,48 +1,22 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getUser, readBody, sameOrigin } from '@/lib/auth';
+import { createOrder, listOrders } from '@/lib/orders';
 
-const ORDER_FIELDS = 'id, design_id, design_name, status, material, color, infill, estimated_hours, estimated_price, created_at';
+export const runtime = 'nodejs';
 
 export async function GET() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-
-    const { data, error } = await supabase
-      .from('orders')
-      .select(ORDER_FIELDS)
-      .order('created_at', { ascending: false });
-
-    if (error) return NextResponse.json({ error: 'Could not load orders' }, { status: 500 });
-    return NextResponse.json({ orders: data });
-  } catch {
-    return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
-  }
+  const user = await getUser();
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  return NextResponse.json({ orders: listOrders(user.id) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const user = await getUser();
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-
-    const body = await request.json();
-    const order = {
-      user_id: user.id,
-      design_id: typeof body.designId === 'string' ? body.designId.slice(0, 100) : null,
-      design_name: typeof body.designName === 'string' ? body.designName.slice(0, 160) : 'Custom design',
-      material: typeof body.material === 'string' ? body.material.slice(0, 40) : 'PLA',
-      color: typeof body.color === 'string' ? body.color.slice(0, 40) : null,
-      infill: Math.min(100, Math.max(0, Number(body.infill) || 0)),
-      estimated_hours: Number.isFinite(Number(body.estimatedHours)) ? Number(body.estimatedHours) : null,
-      estimated_price: Number.isFinite(Number(body.estimatedPrice)) ? Number(body.estimatedPrice) : null,
-    };
-
-    const { data, error } = await supabase.from('orders').insert(order).select(ORDER_FIELDS).single();
-    if (error) return NextResponse.json({ error: 'Could not create order' }, { status: 500 });
-    return NextResponse.json({ order: data }, { status: 201 });
+    return NextResponse.json({ order: createOrder(user.id, await readBody(request)) }, { status: 201 });
   } catch {
-    return NextResponse.json({ error: 'Invalid request or missing Supabase configuration' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid order' }, { status: 400 });
   }
 }

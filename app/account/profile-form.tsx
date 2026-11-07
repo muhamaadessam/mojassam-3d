@@ -1,9 +1,12 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { authRequest } from '@/lib/auth-client';
+import { ACCOUNT_COPY } from '@/lib/copy';
+import type { LanguageKey } from '@/lib/language-config';
 
 type ProfileFormProps = {
+  language: LanguageKey;
   firstName: string;
   lastName: string;
   avatarUrl: string;
@@ -31,25 +34,26 @@ function resizeAvatar(file: File) {
   });
 }
 
-export default function ProfileForm({ firstName: initialFirstName, lastName: initialLastName, avatarUrl: initialAvatarUrl }: ProfileFormProps) {
+export default function ProfileForm({ language, firstName: initialFirstName, lastName: initialLastName, avatarUrl: initialAvatarUrl }: ProfileFormProps) {
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const text = ACCOUNT_COPY[language];
 
   const chooseAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setMessage('اختار صورة بصيغة صحيحة.');
+      setMessage(text.badImage);
       return;
     }
     try {
       setAvatarUrl(await resizeAvatar(file));
-      setMessage('الصورة جاهزة للحفظ.');
+      setMessage(text.imageReady);
     } catch {
-      setMessage('تعذر قراءة الصورة. جرّب صورة أخرى.');
+      setMessage(text.imageFailed);
     }
   };
 
@@ -57,31 +61,27 @@ export default function ProfileForm({ firstName: initialFirstName, lastName: ini
     event.preventDefault();
     setBusy(true);
     setMessage('');
-    const { error } = await createClient().auth.updateUser({
-      data: {
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
-        avatar_url: avatarUrl,
-      },
-    });
-    setMessage(error ? 'تعذر حفظ البيانات الآن.' : 'تم تحديث بيانات الحساب.');
-    setBusy(false);
+    try {
+      await authRequest({ action: 'profile', first_name: firstName.trim(), last_name: lastName.trim(), avatar_url: avatarUrl });
+      setMessage(text.saved);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : text.saveFailed);
+    } finally { setBusy(false); }
   };
 
   return (
     <section className="profile-card">
-      <div className="section-heading"><span>بيانات الحساب</span><span className="estimate-badge">اختياري</span></div>
+      <div className="section-heading"><span>{text.profileTitle}</span><span className="estimate-badge">{text.optional}</span></div>
       <form className="profile-form" onSubmit={saveProfile}>
         <div className="profile-avatar-row">
           {avatarUrl ? <img className="profile-avatar" src={avatarUrl} alt="" /> : <span className="profile-avatar profile-avatar-empty">◎</span>}
-          <label className="avatar-picker">تغيير الصورة<input type="file" accept="image/*" onChange={chooseAvatar} /></label>
+          <label className="avatar-picker">{text.changePhoto}<input type="file" accept="image/*" onChange={chooseAvatar} /></label>
         </div>
         <div className="name-fields">
-          <label>الاسم الأول<input value={firstName} onChange={(event) => setFirstName(event.target.value)} required autoComplete="given-name" /></label>
-          <label>اسم العائلة<input value={lastName} onChange={(event) => setLastName(event.target.value)} required autoComplete="family-name" /></label>
+          <label>{text.firstName}<input value={firstName} onChange={(event) => setFirstName(event.target.value)} required autoComplete="given-name" /></label>
+          <label>{text.lastName}<input value={lastName} onChange={(event) => setLastName(event.target.value)} required autoComplete="family-name" /></label>
         </div>
-        <button className="primary-button" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ التعديلات'}</button>
+        <button className="primary-button" disabled={busy}>{busy ? text.saving : text.save}</button>
       </form>
       {message && <p className="profile-message" role="status">{message}</p>}
     </section>

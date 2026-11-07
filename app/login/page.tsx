@@ -1,11 +1,16 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { authRequest } from '@/lib/auth-client';
+import { ACCOUNT_COPY } from '@/lib/copy';
+import { useLanguage } from '@/lib/language';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { language, toggleLanguage } = useLanguage();
+  const text = ACCOUNT_COPY[language];
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -19,38 +24,12 @@ export default function LoginPage() {
     setBusy(true);
     setMessage('');
     try {
-      const supabase = createClient();
-      const result = mode === 'login'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: { data: { first_name: firstName.trim(), last_name: lastName.trim(), full_name: `${firstName.trim()} ${lastName.trim()}`.trim() } },
-          });
-
-      if (result.error) throw result.error;
-      if (mode === 'signup' && !result.data.session) {
-        setMessage('تم إنشاء الحساب. راجع بريدك الإلكتروني لتأكيده.');
-      } else {
-        router.replace('/account');
-        router.refresh();
-      }
+      await authRequest({ action: mode, email, password, firstName, lastName });
+      router.replace('/account');
+      router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'حدث خطأ. حاول مرة أخرى.');
+      setMessage(error instanceof Error ? error.message : text.genericError);
     } finally {
-      setBusy(false);
-    }
-  };
-
-  const signInWithGoogle = async () => {
-    setBusy(true);
-    setMessage('');
-    const { error } = await createClient().auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
-    if (error) {
-      setMessage(error.message);
       setBusy(false);
     }
   };
@@ -58,27 +37,25 @@ export default function LoginPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <a className="auth-back" href="/">← العودة للمعاينة</a>
-        <p className="eyebrow accent">3D PREVIEW ACCOUNT</p>
-        <h1>{mode === 'login' ? 'سجّل دخولك' : 'اعمل حساب جديد'}</h1>
-        <p className="auth-intro">تابع طلباتك واحفظ تفاصيل الطباعة في مكان واحد.</p>
-        <button className="google-button" onClick={signInWithGoogle} disabled={busy} type="button">
-          <span className="google-mark" aria-hidden="true">G</span>
-          <span>Sign in with Google</span>
-        </button>
-        <div className="auth-divider"><span>أو باستخدام البريد</span></div>
+        <div className="auth-card-top">
+          <Link className="auth-back" href="/">{text.backToPreview}</Link>
+          <button type="button" className="ghost-button" onClick={toggleLanguage}>{text.language}</button>
+        </div>
+        <p className="eyebrow accent">MOJASSAM 3D ACCOUNT</p>
+        <h1>{mode === 'login' ? text.loginTitle : text.signupTitle}</h1>
+        <p className="auth-intro">{text.authIntro}</p>
         <form className="auth-form" onSubmit={submit}>
           {mode === 'signup' && <div className="name-fields">
-            <label>الاسم الأول<input type="text" value={firstName} onChange={(event) => setFirstName(event.target.value)} required autoComplete="given-name" /></label>
-            <label>اسم العائلة<input type="text" value={lastName} onChange={(event) => setLastName(event.target.value)} required autoComplete="family-name" /></label>
+            <label>{text.firstName}<input type="text" value={firstName} onChange={(event) => setFirstName(event.target.value)} required maxLength={80} autoComplete="given-name" /></label>
+            <label>{text.lastName}<input type="text" value={lastName} onChange={(event) => setLastName(event.target.value)} required maxLength={80} autoComplete="family-name" /></label>
           </div>}
-          <label>البريد الإلكتروني<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" /></label>
-          <label>كلمة المرور<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
-          <button className="primary-button" disabled={busy}>{busy ? 'جارٍ التنفيذ…' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب'}</button>
+          <label>{text.email}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" dir="ltr" /></label>
+          <label>{text.password}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} maxLength={128} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} dir="ltr" /></label>
+          <button className="primary-button" disabled={busy}>{busy ? text.working : mode === 'login' ? text.login : text.signup}</button>
         </form>
         {message && <p className="auth-message" role="status">{message}</p>}
         <button className="auth-switch" onClick={() => { setMode((value) => value === 'login' ? 'signup' : 'login'); setMessage(''); }}>
-          {mode === 'login' ? 'ليس لديك حساب؟ أنشئ حسابًا' : 'لديك حساب؟ سجّل الدخول'}
+          {mode === 'login' ? text.toSignup : text.toLogin}
         </button>
       </section>
     </main>

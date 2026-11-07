@@ -6,6 +6,8 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
+  // Avatars are small inline data: URLs, which next/image cannot optimize.
+  { rules: { '@next/next/no-img-element': 'off' } },
 ]);
 
 export default eslintConfig;

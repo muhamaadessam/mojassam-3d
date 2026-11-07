@@ -1,4 +1,4 @@
-# 3D Preview visual direction
+# Mojassam 3D visual direction
 
 THESIS: The interface is a workbench for inspecting a physical object, not a marketing page; the 3D canvas owns the first viewport.
 OWN-WORLD: Midnight navy surfaces, measured lime calibration marks, cool blue light, thin technical dividers, and compact Arabic controls.

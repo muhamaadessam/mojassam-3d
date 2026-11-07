@@ -1,9 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { authRequest } from '@/lib/auth-client';
 
-export default function SignOutButton() {
+export default function SignOutButton({ label }: { label: string }) {
   const router = useRouter();
-  return <button className="ghost-button" onClick={async () => { await createClient().auth.signOut(); router.replace('/'); router.refresh(); }}>تسجيل الخروج</button>;
+  const signOut = async () => {
+    try { await authRequest({ action: 'logout' }); } catch { /* the session is cleared on the next visit anyway */ }
+    router.replace('/');
+    router.refresh();
+  };
+  return <button className="ghost-button" onClick={signOut}>{label}</button>;
 }

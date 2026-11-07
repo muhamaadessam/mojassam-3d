@@ -36,3 +36,10 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# local customer database
+/.data/
+*.tsbuildinfo
+
+# local design-tool cache
+/.impeccable/

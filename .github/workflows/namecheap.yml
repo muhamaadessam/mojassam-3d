@@ -1,0 +1,70 @@
+name: Test and deploy to Namecheap
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: namecheap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build -- --webpack
+      - name: Prepare standalone app and test accounts and orders
+        env:
+          APP_ORIGIN: http://localhost:3188
+          TEST_ORIGIN: http://localhost:3188
+          DATA_DIRECTORY: ${{ runner.temp }}/auth-test
+          HOSTNAME: 127.0.0.1
+          PORT: '3188'
+        run: |
+          cp -R public .next/standalone/public
+          cp -R .next/static .next/standalone/.next/static
+          node .next/standalone/server.js > "$RUNNER_TEMP/app.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent "$APP_ORIGIN/api/health" > /dev/null; then break; fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then cat "$RUNNER_TEMP/app.log"; exit 1; fi
+            sleep 1
+          done
+          curl --fail --silent "$APP_ORIGIN/api/health"
+          npm run test:auth
+      - name: Package release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: tar -czf "$RUNNER_TEMP/release.tar.gz" -C .next/standalone .
+      - name: Deploy to Namecheap
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          DEPLOY_KEY: ${{ secrets.NAMECHEAP_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.NAMECHEAP_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d "$RUNNER_TEMP/ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/ssh/key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/ssh/key" "$RUNNER_TEMP/ssh/known_hosts"
+          trap 'rm -f "$RUNNER_TEMP/ssh/key"' EXIT
+          ssh_options=(-i "$RUNNER_TEMP/ssh/key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o ConnectTimeout=20)
+          ssh "${ssh_options[@]}" -p 21098 konobbue@server144.web-hosting.com 'mkdir -p /home/konobbue/mojassam-releases'
+          scp "${ssh_options[@]}" -P 21098 "$RUNNER_TEMP/release.tar.gz" "konobbue@server144.web-hosting.com:/home/konobbue/mojassam-releases/$GITHUB_SHA.tar.gz"
+          ssh "${ssh_options[@]}" -p 21098 konobbue@server144.web-hosting.com "bash -s -- $GITHUB_SHA" < scripts/deploy-namecheap.sh
