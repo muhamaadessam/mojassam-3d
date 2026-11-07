@@ -18,8 +18,10 @@ Before deploying: `npm run lint && npm run typecheck && npm run build`, then sta
 `.github/workflows/namecheap.yml` runs on pushes to `main`, pull requests targeting `main`, and manual Actions runs. It uses Node.js 24, installs the lockfile, lints, builds, and tests authentication and orders against an isolated database. Only `main` is deployed.
 
 Repository secrets:
-- `NAMECHEAP_SSH_KEY`: dedicated deployment private key.
+- `NAMECHEAP_SSH_KEY`: dedicated deployment private key, authorized with `restrict` and a forced `/home/konobbue/mojassam-ci/receive-namecheap.sh` command. It accepts a commit SHA and release archive, not general SSH commands.
 - `NAMECHEAP_KNOWN_HOSTS`: verified SSH host keys for `[server144.web-hosting.com]:21098`.
+
+Install `scripts/receive-namecheap.sh` and `scripts/deploy-namecheap.sh` under `/home/konobbue/mojassam-ci` when setting up or changing the deployment protocol.
 
 The workflow uploads the Linux standalone bundle to `/home/konobbue/mojassam-releases/<commit>`, smoke-tests it, switches the `current` symlink, and restarts Passenger. `/api/health` verifies the deployed commit and database availability; failure restores the previous startup target. Customer data stays in `/home/konobbue/mojassam-data`. Previous release directories are retained for recovery; remove older ones manually when disk space requires it.
 
