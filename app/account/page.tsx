@@ -24,7 +24,7 @@ export default async function AccountPage() {
     <main className="account-page">
       <DocumentLanguage language={language} />
       <header className="account-header">
-        <div className="account-heading"><Link className="auth-back" href="/">{text.back}</Link><div className="account-title-row">{user.avatar_url ? <img className="account-page-avatar" src={user.avatar_url} alt="" /> : <span className="account-page-avatar account-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</span>}<div><p className="eyebrow accent">MY ACCOUNT</p><h1>{displayName}</h1><p>{user.email}</p></div></div></div>
+        <div className="account-heading"><Link className="auth-back" href="/">{text.back}</Link><div className="account-title-row">{user.avatar_url ? <img className="account-page-avatar" src={user.avatar_url} alt="" /> : <span className="account-page-avatar account-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</span>}<div><p className="eyebrow accent" lang="en">MY ACCOUNT</p><h1>{displayName}</h1><p>{user.email}</p></div></div></div>
         <SignOutButton label={text.signOut} />
       </header>
       <ProfileForm language={language} firstName={user.first_name} lastName={user.last_name} avatarUrl={user.avatar_url} />

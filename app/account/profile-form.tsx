@@ -1,6 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useState } from 'react';
+import { UserIcon } from '@/components/icons';
 import { authRequest } from '@/lib/auth-client';
 import { ACCOUNT_COPY } from '@/lib/copy';
 import type { LanguageKey } from '@/lib/language-config';
@@ -74,7 +75,7 @@ export default function ProfileForm({ language, firstName: initialFirstName, las
       <div className="section-heading"><span>{text.profileTitle}</span><span className="estimate-badge">{text.optional}</span></div>
       <form className="profile-form" onSubmit={saveProfile}>
         <div className="profile-avatar-row">
-          {avatarUrl ? <img className="profile-avatar" src={avatarUrl} alt="" /> : <span className="profile-avatar profile-avatar-empty">◎</span>}
+          {avatarUrl ? <img className="profile-avatar" src={avatarUrl} alt="" /> : <span className="profile-avatar profile-avatar-empty"><UserIcon size={24} /></span>}
           <label className="avatar-picker">{text.changePhoto}<input type="file" accept="image/*" onChange={chooseAvatar} /></label>
         </div>
         <div className="name-fields">
