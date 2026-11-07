@@ -8,32 +8,32 @@ import { getPricing } from '@/lib/settings';
 import { ACCOUNT_COPY, ORDER_STATUS } from '@/lib/copy';
 import { LANGUAGE_COOKIE, type LanguageKey } from '@/lib/language-config';
 import { listOrders } from '@/lib/orders';
-import DocumentLanguage from './document-language';
-import SignOutButton from './sign-out-button';
-import ProfileForm from './profile-form';
+import OrdersHeader from '@/components/account/orders-header';
 
-export const metadata: Metadata = { title: 'حسابي', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'طلباتي', robots: { index: false, follow: false } };
 
-export default async function AccountPage() {
+export default async function OrdersPage() {
   const user = await getUser();
-  if (!user) redirect('/login?next=/account');
+  if (!user) redirect('/login?next=/orders');
   const language: LanguageKey = (await cookies()).get(LANGUAGE_COOKIE)?.value === 'en' ? 'en' : 'ar';
   const text = ACCOUNT_COPY[language];
-  const displayName = `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0];
   const orders = listOrders(user.id);
   const pricing = getPricing();
   const locale = language === 'ar' ? 'ar-EG' : 'en-GB';
   const currency = language === 'ar' ? 'ج.م' : 'EGP';
 
   return (
-    <main className="account-page">
-      <DocumentLanguage language={language} />
-      <header className="account-header">
-        <div className="account-heading"><Link className="auth-back" href="/">{text.back}</Link><div className="account-title-row">{user.avatar_url ? <img className="account-page-avatar" src={user.avatar_url} alt="" /> : <span className="account-page-avatar account-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</span>}<div><p className="eyebrow accent" lang="en">MY ACCOUNT</p><h1>{displayName}</h1><p>{user.email}</p></div></div></div>
-        <SignOutButton label={text.signOut} />
-      </header>
-      <ProfileForm language={language} firstName={user.first_name} lastName={user.last_name} avatarUrl={user.avatar_url} />
-      <section className="orders-list" id="orders">
+    <main className="app-shell orders-shell">
+      <OrdersHeader language={language} />
+      <div className="orders-page">
+        <header className="orders-page-header">
+          <div>
+            <h1>{text.ordersTitle}</h1>
+            <p>{text.ordersIntro}</p>
+          </div>
+          {orders.length > 0 && <span className="orders-count">{text.ordersCount(orders.length)}</span>}
+        </header>
+        <section className="orders-list" aria-label={text.ordersTitle}>
         {orders.length ? orders.map((order) => {
           const design = anyDesign(pricing, order.design_id);
           const color = anyColor(pricing, order.color);
@@ -46,8 +46,9 @@ export default async function AccountPage() {
               <div className="order-metrics">{order.final_price != null ? <><strong>{`${Number(order.final_price).toFixed(2)} ${currency}`}</strong><small>{text.finalPrice}</small></> : <><strong>{order.estimated_price ? `${Number(order.estimated_price).toFixed(2)} ${currency}` : '—'}</strong><small>{text.estimatedPrice}</small></>}<span>{order.estimated_hours ? `${Number(order.estimated_hours).toFixed(2)} ${language === 'ar' ? 'ساعة' : 'h'}` : '—'}</span><small>{new Date(order.created_at).toLocaleDateString(locale)}</small></div>
             </article>
           );
-        }) : <div className="empty-orders">{text.noOrders}</div>}
-      </section>
+        }) : <div className="empty-orders"><p>{text.noOrders}</p><Link className="primary-button compact" href="/#store">{text.browseDesigns}</Link></div>}
+        </section>
+      </div>
     </main>
   );
 }

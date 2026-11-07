@@ -26,3 +26,23 @@ export function ShieldIcon(props: IconProps) {
 export function UserIcon(props: IconProps) {
   return <Icon {...props}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></Icon>;
 }
+
+export function PackageIcon(props: IconProps) {
+  return <Icon {...props}><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" /><path d="m4 7.5 8 4.5 8-4.5" /><path d="M12 12v9" /></Icon>;
+}
+
+export function PencilIcon(props: IconProps) {
+  return <Icon {...props}><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></Icon>;
+}
+
+export function GridIcon(props: IconProps) {
+  return <Icon {...props}><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" /></Icon>;
+}
+
+export function LogoutIcon(props: IconProps) {
+  return <Icon {...props}><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" /><path d="M14 16l4-4-4-4" /><path d="M18 12H9" /></Icon>;
+}
+
+export function ChevronDownIcon(props: IconProps) {
+  return <Icon {...props}><path d="m6 9 6 6 6-6" /></Icon>;
+}

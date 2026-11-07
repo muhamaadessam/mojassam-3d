@@ -27,10 +27,7 @@ export default function LoginPage() {
       await authRequest({ action: mode, email, password, firstName, lastName });
       // Only same-site paths, so a crafted link cannot send the customer to another site.
       const next = new URLSearchParams(window.location.search).get('next');
-      const target = next && /^\/(?![/\\])/.test(next) ? next : '/account';
-      // A section link such as /account#orders reaches here as /login?next=/account#orders:
-      // the browser keeps the fragment across the server redirect, so carry it on.
-      router.replace(target.includes('#') ? target : target + window.location.hash);
+      router.replace(next && /^\/(?![/\\])/.test(next) ? next : '/');
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : text.genericError);

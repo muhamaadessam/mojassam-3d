@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import AuthNav from '@/app/account/auth-nav';
+import AccountMenu from '@/components/account/account-menu';
 import LogoMark from './logo-mark';
 import { UploadIcon } from './icons';
 import type { Copy } from '@/lib/copy';
@@ -12,7 +12,8 @@ export default function SiteHeader({ language, text, onToggleLanguage, onUpload 
   language: LanguageKey;
   text: Copy;
   onToggleLanguage: () => void;
-  onUpload: () => void;
+  /** Opens the page's own file picker; pages without one link to the studio instead. */
+  onUpload?: () => void;
 }) {
   const pathname = usePathname();
   // Same links on every page so the bar never reshuffles between routes.
@@ -40,11 +41,10 @@ export default function SiteHeader({ language, text, onToggleLanguage, onUpload 
         <div className="topbar-actions">
           <span className="topbar-note"><span className="online-dot" aria-hidden="true" />{text.privacyStatus}</span>
           <button className="topbar-lang" onClick={onToggleLanguage} lang={language === 'ar' ? 'en' : 'ar'}>{text.language}</button>
-          <AuthNav language={language} />
-          <button className="primary-button compact topbar-upload" onClick={onUpload}>
-            <UploadIcon size={16} />
-            <span>{text.upload}</span>
-          </button>
+          <AccountMenu language={language} />
+          {onUpload
+            ? <button className="primary-button compact topbar-upload" onClick={onUpload}><UploadIcon size={16} /><span>{text.upload}</span></button>
+            : <Link className="primary-button compact topbar-upload" href="/studio"><UploadIcon size={16} /><span>{text.upload}</span></Link>}
         </div>
       </div>
     </header>
