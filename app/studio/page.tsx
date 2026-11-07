@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import StudioPage from '@/components/studio';
+import { getPricing } from '@/lib/settings';
 
 export const metadata: Metadata = {
   title: 'استوديو المعاينة وحساب تكلفة الطباعة 3D',
@@ -8,4 +9,8 @@ export const metadata: Metadata = {
   openGraph: { url: '/studio' },
 };
 
-export default StudioPage;
+export const dynamic = 'force-dynamic';
+
+export default function Studio() {
+  return <StudioPage pricing={getPricing()} />;
+}

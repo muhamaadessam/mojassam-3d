@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
-import { findDesign, getReadyPrice, MATERIALS } from '@/lib/catalog';
+import { DEFAULT_PRICING, findDesign, getReadyPrice, orderTotal } from '@/lib/catalog';
 
 export const alt = 'Mojassam 3D — Preview 3D files and estimate print cost';
 export const size = { width: 1200, height: 630 };
@@ -15,8 +15,10 @@ const font = (weight: 500 | 700 | 800) => readFile(join(process.cwd(), `assets/f
 export default async function OpenGraphImage() {
   const [medium, bold, extraBold] = await Promise.all([font(500), font(700), font(800)]);
   const mark = `data:image/svg+xml;base64,${(await readFile(join(process.cwd(), 'public/brand/mojassam-mark.svg'))).toString('base64')}`;
-  const sample = findDesign('wave-vase')!;
-  const samplePrice = Math.round(getReadyPrice(sample)).toLocaleString('en-US');
+  // Rendered at build time, so it shows the default catalog rather than live admin prices.
+  const sample = findDesign(DEFAULT_PRICING, 'wave-vase')!;
+  const samplePrice = Math.round(orderTotal(DEFAULT_PRICING, getReadyPrice(sample, DEFAULT_PRICING))).toLocaleString('en-US');
+  const sampleMaterial = DEFAULT_PRICING.materials.find((material) => material.id === sample.material)!;
 
   const chip = (label: string, color = C.text) => (
     <div style={{ display: 'flex', padding: '10px 18px', borderRadius: 999, border: `1.5px solid ${C.border}`, background: 'rgba(18,27,48,.8)', color, fontSize: 22, fontWeight: 700, letterSpacing: 1 }}>{label}</div>
@@ -57,7 +59,7 @@ export default async function OpenGraphImage() {
           <img src={mark} width={330} height={330} alt="" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 18, padding: '18px 24px', width: 400, borderRadius: 20, background: 'rgba(18,27,48,.92)', border: `1.5px solid ${C.border}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 700, letterSpacing: 2, color: C.muted }}>
-              <span>ESTIMATE</span><span style={{ color: C.info }}>{MATERIALS[sample.material].label} · {sample.weightGrams} g</span>
+              <span>ESTIMATE</span><span style={{ color: C.info }}>{sampleMaterial.label} · {sample.weightGrams} g</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ fontSize: 24, fontWeight: 700, whiteSpace: 'nowrap' }}>{sample.nameEn}</span>

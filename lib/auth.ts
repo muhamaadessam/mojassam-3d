@@ -20,12 +20,28 @@ CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NU
 CREATE TABLE IF NOT EXISTS attempts (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), design_id TEXT, design_name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', material TEXT, color TEXT, infill REAL, estimated_hours REAL, estimated_price REAL, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS orders_user_created ON orders(user_id, created_at);
-CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);`);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS orders_created ON orders(created_at);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);`);
+  // Columns added after the first release; ALTER fails harmlessly once they exist.
+  for (const column of ['quantity INTEGER NOT NULL DEFAULT 1', "phone TEXT NOT NULL DEFAULT ''", "customer_note TEXT NOT NULL DEFAULT ''", 'final_price REAL', "admin_note TEXT NOT NULL DEFAULT ''", 'updated_at TEXT']) {
+    try { db.exec(`ALTER TABLE orders ADD COLUMN ${column}`); } catch { /* already added */ }
+  }
   database = db;
   return db;
 }
 
-export type User = { id: string; email: string; first_name: string; last_name: string; avatar_url: string };
+export type User = { id: string; email: string; first_name: string; last_name: string; avatar_url: string; is_admin: boolean };
+
+/** Shop owners: comma-separated emails in ADMIN_EMAILS. They must still sign in with their own password. */
+export function isAdminEmail(email: string) {
+  return (process.env.ADMIN_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean).includes(email.toLowerCase());
+}
+
+export async function getAdmin() {
+  const user = await getUser();
+  return user?.is_admin ? user : null;
+}
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const cookieName = 'mojassam_session';
 
@@ -36,7 +52,8 @@ export class RateLimitError extends Error {
 export async function getUser(): Promise<User | null> {
   const token = (await cookies()).get(cookieName)?.value;
   if (!token) return null;
-  return getDb().prepare('SELECT u.id, u.email, u.first_name, u.last_name, u.avatar_url FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>?').get(hash(token), Date.now()) as User | undefined ?? null;
+  const user = getDb().prepare('SELECT u.id, u.email, u.first_name, u.last_name, u.avatar_url FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>?').get(hash(token), Date.now()) as Omit<User, 'is_admin'> | undefined;
+  return user ? { ...user, is_admin: isAdminEmail(user.email) } : null;
 }
 
 /** Fixed 15-minute window counter. Throws RateLimitError once `maximum` is exceeded. */

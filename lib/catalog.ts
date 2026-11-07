@@ -1,8 +1,8 @@
-// Shared by the browser and the server. The server recomputes every price from
-// these values, so a request can never set its own price.
+// Shared by the browser and the server. Prices come from the shop's pricing settings
+// (edited in /admin); the server recomputes every price, so a request can never set its own.
 
-export type MaterialKey = 'pla' | 'petg';
-export type PrintColor = { id: string; ar: string; en: string; hex: string };
+export type Material = { id: string; label: string; density: number; rate: number; enabled: boolean };
+export type PrintColor = { id: string; ar: string; en: string; hex: string; enabled: boolean };
 export type ReadyDesign = {
   id: string;
   nameAr: string;
@@ -11,58 +11,105 @@ export type ReadyDesign = {
   descriptionEn: string;
   categoryAr: string;
   categoryEn: string;
-  material: MaterialKey;
+  material: string;
   infill: number;
   weightGrams: number;
   printHours: number;
   artClass: string;
   image?: string;
+  enabled: boolean;
+};
+export type Pricing = {
+  /** EGP per machine hour. */
+  machineHourlyRate: number;
+  /** Scales the estimated print time of uploaded files (1 = as calculated). */
+  timeMultiplier: number;
+  /** Fixed setup fee added to every order, in EGP. */
+  setupFee: number;
+  /** No order is priced below this, in EGP. */
+  minimumPrice: number;
+  /** When false, new orders are refused and customers see `notice`. */
+  acceptingOrders: boolean;
+  /** Optional banner shown to customers (e.g. holiday hours). */
+  notice: string;
+  materials: Material[];
+  colors: PrintColor[];
+  designs: ReadyDesign[];
 };
 export type Dimensions = { x: number; y: number; z: number };
 
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
-export const MACHINE_HOURLY_RATE = 15;
-export const MATERIALS: Record<MaterialKey, { density: number; rate: number; label: string; colorToken: string }> = {
-  pla: { density: 1.24, rate: 6, label: 'PLA', colorToken: '--color-brand' },
-  petg: { density: 1.27, rate: 8, label: 'PETG', colorToken: '--color-info' },
+export const MAX_QUANTITY = 50;
+
+export const DEFAULT_PRICING: Pricing = {
+  machineHourlyRate: 15,
+  timeMultiplier: 1,
+  setupFee: 0,
+  minimumPrice: 0,
+  acceptingOrders: true,
+  notice: '',
+  materials: [
+    { id: 'pla', label: 'PLA', density: 1.24, rate: 6, enabled: true },
+    { id: 'petg', label: 'PETG', density: 1.27, rate: 8, enabled: true },
+  ],
+  colors: [
+    { id: 'lime', ar: 'ليموني', en: 'Lime', hex: '#b5f23d', enabled: true },
+    { id: 'black', ar: 'أسود', en: 'Black', hex: '#171b28', enabled: true },
+    { id: 'white', ar: 'أبيض', en: 'White', hex: '#f4f6f0', enabled: true },
+    { id: 'blue', ar: 'أزرق', en: 'Blue', hex: '#5ba7ff', enabled: true },
+    { id: 'orange', ar: 'برتقالي', en: 'Orange', hex: '#f59b5b', enabled: true },
+    { id: 'pink', ar: 'وردي', en: 'Pink', hex: '#ef8fb5', enabled: true },
+  ],
+  designs: [
+    { id: 'desk-organizer', nameAr: 'منظّم مكتب', nameEn: 'Desk organizer', descriptionAr: 'خانات عملية للأقلام والكروت.', descriptionEn: 'Practical slots for pens and cards.', categoryAr: 'مكتب', categoryEn: 'Desk', material: 'pla', infill: 20, weightGrams: 72, printHours: 2.5, artClass: 'organizer', enabled: true },
+    { id: 'wave-vase', nameAr: 'مزهرية الموجة', nameEn: 'Wave vase', descriptionAr: 'شكل هادئ يضيف لمسة للمكان.', descriptionEn: 'A calm form that adds character to a room.', categoryAr: 'ديكور', categoryEn: 'Decor', material: 'petg', infill: 15, weightGrams: 118, printHours: 4, artClass: 'vase', enabled: true },
+    { id: 'phone-stand', nameAr: 'حامل موبايل', nameEn: 'Phone stand', descriptionAr: 'حامل ثابت للمكتب أو بجانب السرير.', descriptionEn: 'A stable stand for your desk or bedside.', categoryAr: 'إكسسوارات', categoryEn: 'Accessories', material: 'pla', infill: 25, weightGrams: 54, printHours: 1.75, artClass: 'stand', enabled: true },
+  ],
 };
-export const PRINT_COLORS: PrintColor[] = [
-  { id: 'lime', ar: 'ليموني', en: 'Lime', hex: '#b5f23d' },
-  { id: 'black', ar: 'أسود', en: 'Black', hex: '#171b28' },
-  { id: 'white', ar: 'أبيض', en: 'White', hex: '#f4f6f0' },
-  { id: 'blue', ar: 'أزرق', en: 'Blue', hex: '#5ba7ff' },
-  { id: 'orange', ar: 'برتقالي', en: 'Orange', hex: '#f59b5b' },
-  { id: 'pink', ar: 'وردي', en: 'Pink', hex: '#ef8fb5' },
-];
-export const READY_DESIGNS: ReadyDesign[] = [
-  { id: 'desk-organizer', nameAr: 'منظّم مكتب', nameEn: 'Desk organizer', descriptionAr: 'خانات عملية للأقلام والكروت.', descriptionEn: 'Practical slots for pens and cards.', categoryAr: 'مكتب', categoryEn: 'Desk', material: 'pla', infill: 20, weightGrams: 72, printHours: 2.5, artClass: 'organizer' },
-  { id: 'wave-vase', nameAr: 'مزهرية الموجة', nameEn: 'Wave vase', descriptionAr: 'شكل هادئ يضيف لمسة للمكان.', descriptionEn: 'A calm form that adds character to a room.', categoryAr: 'ديكور', categoryEn: 'Decor', material: 'petg', infill: 15, weightGrams: 118, printHours: 4, artClass: 'vase' },
-  { id: 'phone-stand', nameAr: 'حامل موبايل', nameEn: 'Phone stand', descriptionAr: 'حامل ثابت للمكتب أو بجانب السرير.', descriptionEn: 'A stable stand for your desk or bedside.', categoryAr: 'إكسسوارات', categoryEn: 'Accessories', material: 'pla', infill: 25, weightGrams: 54, printHours: 1.75, artClass: 'stand' },
-];
 
-export const isMaterial = (value: unknown): value is MaterialKey => value === 'pla' || value === 'petg';
-export const findColor = (id: unknown) => PRINT_COLORS.find((color) => color.id === id);
-export const findDesign = (id: unknown) => READY_DESIGNS.find((design) => design.id === id);
-
-export function getReadyPrice(design: ReadyDesign) {
-  return design.weightGrams * MATERIALS[design.material].rate + design.printHours * MACHINE_HOURLY_RATE;
+/** What customers may pick from: only enabled items. */
+export function publicCatalog(pricing: Pricing) {
+  const materials = pricing.materials.filter((material) => material.enabled);
+  const materialIds = new Set(materials.map((material) => material.id));
+  return {
+    materials,
+    colors: pricing.colors.filter((color) => color.enabled),
+    designs: pricing.designs.filter((design) => design.enabled && materialIds.has(design.material)),
+  };
 }
 
-export function estimateMachineHours(volumeCm3: number, dimensionsMm: Dimensions, infill: number) {
+export const findMaterial = (pricing: Pricing, id: unknown) => pricing.materials.find((material) => material.id === id && material.enabled);
+export const findColor = (pricing: Pricing, id: unknown) => pricing.colors.find((color) => color.id === id && color.enabled);
+export const findDesign = (pricing: Pricing, id: unknown) => publicCatalog(pricing).designs.find((design) => design.id === id);
+/** Any color ever configured, enabled or not — for labelling past orders. */
+export const anyColor = (pricing: Pricing, id: unknown) => pricing.colors.find((color) => color.id === id);
+export const anyDesign = (pricing: Pricing, id: unknown) => pricing.designs.find((design) => design.id === id);
+
+/** What the customer pays for `quantity` pieces: the setup fee is charged once, then the minimum applies. */
+export function orderTotal(pricing: Pricing, unitPrice: number, quantity = 1) {
+  return Math.max(pricing.minimumPrice, unitPrice * quantity + pricing.setupFee);
+}
+
+/** Price of one piece of a ready design, before the setup fee and minimum. */
+export function getReadyPrice(design: ReadyDesign, pricing: Pricing) {
+  const rate = pricing.materials.find((material) => material.id === design.material)?.rate ?? 0;
+  return design.weightGrams * rate + design.printHours * pricing.machineHourlyRate;
+}
+
+export function estimateMachineHours(volumeCm3: number, dimensionsMm: Dimensions, infill: number, pricing: Pricing) {
   const largestDimension = Math.max(dimensionsMm.x, dimensionsMm.y, dimensionsMm.z);
   const sizeFactor = Math.max(1, largestDimension / 100);
   const infillFactor = 0.7 + infill / 100;
-  return Math.max(0.25, 0.25 + (volumeCm3 / 14) * sizeFactor * infillFactor);
+  return Math.max(0.25, 0.25 + (volumeCm3 / 14) * sizeFactor * infillFactor) * pricing.timeMultiplier;
 }
 
-/** Preliminary estimate for an uploaded model, from its measured volume and size. */
-export function estimateCustomPrint(volumeMm3: number, dimensionsMm: Dimensions, infill: number, material: MaterialKey) {
+/** Preliminary estimate for one piece of an uploaded model, from its measured volume and size. */
+export function estimateCustomPrint(volumeMm3: number, dimensionsMm: Dimensions, infill: number, material: Material, pricing: Pricing) {
   const volumeCm3 = volumeMm3 / 1000;
-  const selected = MATERIALS[material];
   const effectiveFraction = Math.min(1, 0.15 + (infill / 100) * 0.85);
-  const weightGrams = volumeCm3 * selected.density * effectiveFraction;
-  const materialCost = weightGrams * selected.rate;
-  const hours = estimateMachineHours(volumeCm3, dimensionsMm, infill);
-  const machineCost = hours * MACHINE_HOURLY_RATE;
+  const weightGrams = volumeCm3 * material.density * effectiveFraction;
+  const materialCost = weightGrams * material.rate;
+  const hours = estimateMachineHours(volumeCm3, dimensionsMm, infill, pricing);
+  const machineCost = hours * pricing.machineHourlyRate;
   return { weightGrams, materialCost, hours, machineCost, price: materialCost + machineCost };
 }

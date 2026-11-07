@@ -34,6 +34,8 @@ jobs:
           APP_ORIGIN: http://localhost:3188
           TEST_ORIGIN: http://localhost:3188
           DATA_DIRECTORY: ${{ runner.temp }}/auth-test
+          ADMIN_EMAILS: admin-ci@example.test
+          TEST_ADMIN_EMAIL: admin-ci@example.test
           HOSTNAME: 127.0.0.1
           PORT: '3188'
         run: |

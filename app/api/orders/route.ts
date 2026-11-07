@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUser, readBody, sameOrigin } from '@/lib/auth';
-import { createOrder, listOrders } from '@/lib/orders';
+import { createOrder, listOrders, OrderError } from '@/lib/orders';
 
 export const runtime = 'nodejs';
 
@@ -16,7 +16,8 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   try {
     return NextResponse.json({ order: createOrder(user.id, await readBody(request)) }, { status: 201 });
-  } catch {
+  } catch (error) {
+    if (error instanceof OrderError) return NextResponse.json({ error: error.message }, { status: 409 });
     return NextResponse.json({ error: 'Invalid order' }, { status: 400 });
   }
 }

@@ -30,6 +30,7 @@ export default function AuthNav({ language }: { language: LanguageKey }) {
 
   return (
     <>
+      {user.is_admin && <Link className="topbar-link admin-link" href="/admin">{language === 'ar' ? 'لوحة التحكم' : 'Dashboard'}</Link>}
       <Link className="topbar-link orders-link" href="/account#orders">{language === 'ar' ? 'سجل الطلبات' : 'Order history'}</Link>
       <Link className="account-menu" href="/account" title={user.email} aria-label={`${language === 'ar' ? 'حسابي' : 'My account'}: ${profile.name}`}>
         {profile.avatar ? <img src={profile.avatar} alt="" /> : <span className="account-avatar-fallback">{initials}</span>}
