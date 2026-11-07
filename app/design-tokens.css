@@ -47,6 +47,10 @@
   --color-grid-minor: #1e293b;
   --color-grid-ground: #111827;
 
+  /* Layout */
+  --page-max: 1440px;
+  --shell-pad: 28px;
+
   /* Shape + elevation */
   --radius-control: 9px;
   --radius-card: 17px;

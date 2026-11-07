@@ -324,7 +324,6 @@ export default function StudioPage() {
       <SiteHeader
         language={language}
         text={text}
-        nav={[{ href: '/', label: text.home }, { href: '#studio', label: text.studioNav }]}
         onToggleLanguage={toggleLanguage}
         onUpload={() => fileInputRef.current?.click()}
       />

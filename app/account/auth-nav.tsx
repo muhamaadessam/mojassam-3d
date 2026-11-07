@@ -22,18 +22,18 @@ export default function AuthNav({ language }: { language: LanguageKey }) {
   }, []);
 
   // Reserve the space while checking, instead of flashing "Sign in" at signed-in customers.
-  if (!loaded) return <span className="ghost-button account-link" aria-hidden="true" style={{ visibility: 'hidden' }}>{language === 'ar' ? 'تسجيل الدخول' : 'Sign in'}</span>;
-  if (!user) return <Link className="ghost-button account-link" href="/login">{language === 'ar' ? 'تسجيل الدخول' : 'Sign in'}</Link>;
+  if (!loaded) return <span className="topbar-link account-link" aria-hidden="true" style={{ visibility: 'hidden' }}>{language === 'ar' ? 'تسجيل الدخول' : 'Sign in'}</span>;
+  if (!user) return <Link className="topbar-link account-link" href="/login">{language === 'ar' ? 'تسجيل الدخول' : 'Sign in'}</Link>;
 
   const profile = getProfile(user);
   const initials = profile.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 
   return (
     <>
-      <Link className="orders-link" href="/account#orders">{language === 'ar' ? 'سجل الطلبات' : 'Order history'}</Link>
-      <Link className="account-menu" href="/account" title={language === 'ar' ? 'فتح الحساب' : 'Open account'}>
+      <Link className="topbar-link orders-link" href="/account#orders">{language === 'ar' ? 'سجل الطلبات' : 'Order history'}</Link>
+      <Link className="account-menu" href="/account" title={user.email} aria-label={`${language === 'ar' ? 'حسابي' : 'My account'}: ${profile.name}`}>
         {profile.avatar ? <img src={profile.avatar} alt="" /> : <span className="account-avatar-fallback">{initials}</span>}
-        <span className="account-menu-copy"><strong>{profile.name}</strong><small>{user.email}</small></span>
+        <span className="account-menu-name">{profile.name}</span>
       </Link>
     </>
   );
