@@ -74,7 +74,6 @@ export default function Home() {
       <SiteHeader
         language={language}
         text={text}
-        nav={[{ href: '/studio', label: text.studioNav }, { href: '#store', label: text.storeNav }]}
         onToggleLanguage={toggleLanguage}
         onUpload={() => fileInputRef.current?.click()}
       />
