@@ -1,10 +1,35 @@
 import type { Metadata, Viewport } from 'next';
+import { SITE_DESCRIPTION_AR, SITE_KEYWORDS, SITE_NAME, SITE_TITLE_AR, SITE_URL } from '@/lib/site';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Mojassam 3D — عاين تصميمك قبل الطباعة',
-  description: 'ارفع ملف 3D وشوفه وتحرّك حوله واحسب تقديرًا مبدئيًا للتكلفة داخل المتصفح.',
-  appleWebApp: { title: 'Mojassam 3D' },
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE_TITLE_AR, template: `%s | ${SITE_NAME}` },
+  description: SITE_DESCRIPTION_AR,
+  applicationName: SITE_NAME,
+  keywords: SITE_KEYWORDS,
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: '3D printing',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    url: '/',
+    siteName: SITE_NAME,
+    title: SITE_TITLE_AR,
+    description: SITE_DESCRIPTION_AR,
+    locale: 'ar_EG',
+    alternateLocale: ['en_US'],
+  },
+  twitter: { card: 'summary_large_image', title: SITE_TITLE_AR, description: SITE_DESCRIPTION_AR },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 },
+  },
+  appleWebApp: { title: SITE_NAME },
+  formatDetection: { telephone: false },
 };
 
 // Colors the browser UI (Android address bar, iOS status bar) to match the page.
@@ -17,6 +42,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl">
+      <head>
+        <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM summary" />
+      </head>
       <body>{children}</body>
     </html>
   );

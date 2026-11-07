@@ -1,0 +1,21 @@
+# Mojassam 3D (مجسّم 3D)
+
+> Mojassam 3D is a bilingual (Arabic / English) browser tool for 3D printing in Egypt. Upload an STL, OBJ, or 3MF file (up to 50 MB), inspect the model in 3D, check its dimensions, and get a preliminary print-cost estimate in Egyptian pounds (EGP). Files are parsed locally in the browser and are never uploaded or stored.
+
+## Pages
+
+- [Home](https://mojassam3d.muhammadessam.me/): overview, file upload entry, ready-to-print designs store, and FAQ.
+- [Studio — preview & pricing](https://mojassam3d.muhammadessam.me/studio): interactive 3D viewer with material, infill, and color options and a live preliminary estimate.
+
+## Key facts
+
+- Supported formats: STL, OBJ, 3MF; maximum 50 MB.
+- Privacy: models are processed on the user's device only; nothing is uploaded.
+- Materials: PLA (6 EGP per gram) and PETG (8 EGP per gram).
+- Machine time: 15 EGP per hour.
+- Preliminary price formula: weight (g) × material rate + machine hours × 15 EGP. Weight is derived from model volume and infill.
+- Colors: lime, black, white, blue, orange, pink.
+- Ready designs: desk organizer (PLA, 72 g), wave vase (PETG, 118 g), phone stand (PLA, 54 g).
+- Estimates are preliminary; the final price can change after slicer review.
+- Out of scope: online payment, file sharing, cloud model storage, exact slicer quotes.
+- Accounts: email and password; users can see their order history.
