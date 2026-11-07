@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:auth": "node scripts/check-auth.mjs"
+    "test:auth": "node scripts/check-auth.mjs",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "next": "16.4.5",
