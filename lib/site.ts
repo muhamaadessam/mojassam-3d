@@ -5,7 +5,7 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://mojassam3d
 export const SITE_NAME = 'Mojassam 3D';
 export const SITE_NAME_AR = 'مجسّم 3D';
 
-export const SITE_TITLE_AR = 'Mojassam 3D — معاينة ملفات 3D وحساب تكلفة الطباعة ثلاثية الأبعاد';
+export const SITE_TITLE_AR = 'معاينة ملفات 3D وحساب تكلفة الطباعة ثلاثية الأبعاد | Mojassam 3D';
 export const SITE_DESCRIPTION_AR =
   'ارفع ملف STL أو OBJ أو 3MF، عاين المجسم ثلاثي الأبعاد داخل المتصفح، راجع الأبعاد، واحسب تقديرًا مبدئيًا لتكلفة الطباعة 3D بالجنيه المصري — الملف لا يغادر جهازك.';
 export const SITE_DESCRIPTION_EN =
