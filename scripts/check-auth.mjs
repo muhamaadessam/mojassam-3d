@@ -48,6 +48,63 @@ const loggedIn = await request('/api/auth', { action: 'login', email: `a-${suffi
 assert.equal(loggedIn.status, 200);
 assert.equal((await request('/api/orders', undefined, loggedIn.cookie)).body.orders.length, 2);
 
+// Quantity and contact details are stored; the total is still computed on the server.
+const multi = await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue', quantity: 3, phone: '01012345678', note: 'pickup Friday' }, loggedIn.cookie);
+assert.equal(multi.status, 201);
+assert.equal(multi.body.order.quantity, 3);
+assert.equal(multi.body.order.estimated_price, (54 * 6 + 1.75 * 15) * 3);
+assert.equal(multi.body.order.phone, '01012345678');
+assert.equal((await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue', quantity: 0 }, loggedIn.cookie)).status, 400);
+assert.equal((await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue', phone: '<script>' }, loggedIn.cookie)).status, 400);
+
+// Customers cannot reach the admin dashboard API.
+assert.equal((await request('/api/admin/orders', undefined, loggedIn.cookie)).status, 403);
+assert.equal((await request('/api/admin/settings', { machineHourlyRate: 0 }, loggedIn.cookie)).status, 403);
+assert.equal((await request('/api/admin/orders')).status, 403);
+
+// Admin (set TEST_ADMIN_EMAIL to an address listed in the server's ADMIN_EMAILS).
+const adminEmail = process.env.TEST_ADMIN_EMAIL;
+if (adminEmail) {
+  let admin = await request('/api/auth', { action: 'signup', email: adminEmail, password, firstName: 'Shop', lastName: 'Owner' }, '', { ip: visitor() });
+  if (admin.status !== 200) admin = await request('/api/auth', { action: 'login', email: adminEmail, password: process.env.TEST_ADMIN_PASSWORD || password }, '', { ip: visitor() });
+  assert.equal(admin.status, 200);
+  assert.equal(admin.body.user.is_admin, true);
+  const original = (await request('/api/admin/settings', undefined, admin.cookie)).body.pricing;
+  assert.ok(original.materials.length);
+
+  // Invalid settings are refused.
+  assert.equal((await request('/api/admin/settings', { ...original, machineHourlyRate: -1 }, admin.cookie)).status, 400);
+  assert.equal((await request('/api/admin/settings', { ...original, colors: original.colors.map((color) => ({ ...color, hex: 'red' })) }, admin.cookie)).status, 400);
+
+  // New prices apply to the next order immediately.
+  const changed = { ...original, machineHourlyRate: 20, setupFee: 10, materials: original.materials.map((m) => (m.id === 'pla' ? { ...m, rate: 7 } : m)) };
+  assert.equal((await request('/api/admin/settings', changed, admin.cookie)).status, 200);
+  const repriced = await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue' }, loggedIn.cookie);
+  assert.equal(repriced.body.order.estimated_price, 54 * 7 + 1.75 * 20 + 10);
+
+  // Pausing orders refuses new ones.
+  assert.equal((await request('/api/admin/settings', { ...changed, acceptingOrders: false, notice: 'Closed for Eid' }, admin.cookie)).status, 200);
+  const paused = await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue' }, loggedIn.cookie);
+  assert.equal(paused.status, 409);
+  assert.equal(paused.body.error, 'Closed for Eid');
+  assert.equal((await request('/api/admin/settings', original, admin.cookie)).status, 200);
+
+  // The admin sees every customer's orders and can confirm one; the customer sees the update.
+  const all = (await request('/api/admin/orders', undefined, admin.cookie)).body.orders;
+  assert.ok(all.some((order) => order.id === repriced.body.order.id));
+  const update = await request('/api/admin/orders', { id: repriced.body.order.id, status: 'printing', finalPrice: 400, adminNote: 'Ready Sunday' }, admin.cookie);
+  assert.equal(update.status, 200);
+  assert.equal(update.body.order.status, 'printing');
+  const mine = (await request('/api/orders', undefined, loggedIn.cookie)).body.orders.find((order) => order.id === repriced.body.order.id);
+  assert.equal(mine.final_price, 400);
+  assert.equal(mine.admin_note, 'Ready Sunday');
+  assert.equal((await request('/api/admin/orders', { id: repriced.body.order.id, status: 'shipped-to-mars' }, admin.cookie)).status, 400);
+  assert.equal((await request('/api/admin/orders', { action: 'delete', id: repriced.body.order.id }, admin.cookie)).status, 200);
+  console.log('Passed: admin settings validation, live repricing, pausing orders, and order updates.');
+} else {
+  console.log('Skipped admin checks: set TEST_ADMIN_EMAIL (listed in ADMIN_EMAILS) to run them.');
+}
+
 // Rate limits: an attacker guessing a password gets blocked, but the real owner can still sign in from elsewhere.
 const attacker = visitor();
 const statuses = [];

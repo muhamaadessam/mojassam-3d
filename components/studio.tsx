@@ -8,7 +8,8 @@ import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import SiteHeader from './site-header';
 import { ShieldIcon, UploadIcon } from './icons';
-import { estimateCustomPrint, MACHINE_HOURLY_RATE, MATERIALS, PRINT_COLORS, type MaterialKey, type PrintColor } from '@/lib/catalog';
+import { estimateCustomPrint, orderTotal, publicCatalog, type Pricing, type PrintColor } from '@/lib/catalog';
+import OrderExtras, { EMPTY_EXTRAS } from './order-extras';
 import { COPY, type FileErrorKey } from '@/lib/copy';
 import { formatBytes, formatNumber, getFormat, validateModelFile, type SupportedFormat } from '@/lib/model-file';
 import { clearPendingFile, readPendingFile } from '@/lib/pending-file';
@@ -16,7 +17,7 @@ import { useLanguage } from '@/lib/language';
 
 type ViewerState = 'idle' | 'loading' | 'ready' | 'error';
 type UnitKey = 'mm' | 'cm' | 'in';
-type OrderState = 'idle' | 'saving' | 'saved' | 'login' | 'failed';
+type OrderState = 'idle' | 'saving' | 'saved' | 'login' | 'failed' | 'paused';
 type ModelMetadata = {
   format: SupportedFormat;
   fileName: string;
@@ -106,7 +107,8 @@ function calculateVolumeAndTriangles(object: THREE.Object3D) {
   };
 }
 
-export default function StudioPage() {
+export default function StudioPage({ pricing }: { pricing: Pricing }) {
+  const { materials, colors } = publicCatalog(pricing);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewerHostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -119,10 +121,11 @@ export default function StudioPage() {
   const [viewerState, setViewerState] = useState<ViewerState>('idle');
   const [metadata, setMetadata] = useState<ModelMetadata | null>(null);
   const [error, setError] = useState<FileErrorKey | null>(null);
-  const [materialKey, setMaterialKey] = useState<MaterialKey>('pla');
+  const [materialKey, setMaterialKey] = useState(materials[0].id);
+  const [extras, setExtras] = useState(EMPTY_EXTRAS);
   const [unit, setUnit] = useState<UnitKey>('mm');
   const [infill, setInfill] = useState(20);
-  const [printColor, setPrintColor] = useState<PrintColor>(PRINT_COLORS[0]);
+  const [printColor, setPrintColor] = useState<PrintColor>(colors[0]);
   const printColorRef = useRef(printColor.hex);
   const [gridVisible, setGridVisible] = useState(true);
   const [autoRotate, setAutoRotate] = useState(false);
@@ -295,11 +298,12 @@ export default function StudioPage() {
     if (file) void loadFile(file);
   };
 
-  const selectedMaterial = MATERIALS[materialKey];
+  const selectedMaterial = materials.find((material) => material.id === materialKey) ?? materials[0];
   const dimensions = metadata
     ? [0, 1, 2].map((index) => `${formatNumber(metadata.dimensionsMm.getComponent(index) * UNIT_FACTORS[unit])} ${unit}`).join(' × ')
     : '—';
-  const estimate = metadata?.volumeMm3 ? estimateCustomPrint(metadata.volumeMm3, metadata.dimensionsMm, infill, materialKey) : null;
+  const estimate = metadata?.volumeMm3 ? estimateCustomPrint(metadata.volumeMm3, metadata.dimensionsMm, infill, selectedMaterial, pricing) : null;
+  const total = estimate ? orderTotal(pricing, estimate.price, extras.quantity) : 0;
   const money = (value: number) => `${formatNumber(value)} ${text.currency}`;
 
   const orderFile = async () => {
@@ -310,14 +314,14 @@ export default function StudioPage() {
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'custom', fileName: metadata.fileName, material: materialKey, infill, colorId: printColor.id, volumeMm3: metadata.volumeMm3, dimensionsMm: { x, y, z } }),
+        body: JSON.stringify({ kind: 'custom', fileName: metadata.fileName, material: selectedMaterial.id, infill, colorId: printColor.id, volumeMm3: metadata.volumeMm3, dimensionsMm: { x, y, z }, ...extras }),
       });
-      setOrderState(response.status === 401 ? 'login' : response.ok ? 'saved' : 'failed');
+      setOrderState(response.status === 401 ? 'login' : response.ok ? 'saved' : response.status === 409 ? 'paused' : 'failed');
     } catch {
       setOrderState('failed');
     }
   };
-  const orderMessage = { idle: '', saving: text.orderSaving, saved: text.orderConfirmed, login: text.loginRequired, failed: text.orderFailed }[orderState];
+  const orderMessage = { idle: '', saving: text.orderSaving, saved: text.orderConfirmed, login: text.loginRequired, failed: text.orderFailed, paused: pricing.notice || text.ordersPaused }[orderState];
 
   return (
     <main className="app-shell">
@@ -409,14 +413,14 @@ export default function StudioPage() {
           <section className="pricing-card">
             <div className="section-heading"><span>{text.estimate}</span><span className="estimate-badge">{text.preliminary}</span></div>
             <div className="pricing-controls">
-              <label>{text.material}<select value={materialKey} onChange={(event) => setMaterialKey(event.target.value as MaterialKey)}><option value="pla">{text.pla}</option><option value="petg">{text.petg}</option></select></label>
+              <label>{text.material}<select value={selectedMaterial.id} onChange={(event) => setMaterialKey(event.target.value)}>{materials.map((material) => <option key={material.id} value={material.id}>{material.id === 'pla' ? text.pla : material.id === 'petg' ? text.petg : material.label}</option>)}</select></label>
               <label>{text.infill} <output>{infill}%</output><input type="range" min="10" max="100" step="5" value={infill} onChange={(event) => setInfill(Number(event.target.value))} /></label>
               <label className="auto-hours"><span>{text.printHours}</span><output>{estimate ? `${formatNumber(estimate.hours, 2)} ${text.hoursUnit}` : '—'}</output></label>
             </div>
             <div className="color-picker">
               <span>{text.printColor}</span>
               <div className="color-swatches" role="radiogroup" aria-label={text.printColor}>
-                {PRINT_COLORS.map((color) => (
+                {colors.map((color) => (
                   <button
                     key={color.id}
                     className={`color-swatch ${printColor.id === color.id ? 'selected' : ''}`}
@@ -439,7 +443,7 @@ export default function StudioPage() {
             {estimateRequested && (
               <div className="price-result">
                 <span>{text.totalCost}</span>
-                <strong>{estimate ? <>{formatNumber(estimate.price)} <small>{text.currency}</small></> : '—'}</strong>
+                <strong>{estimate ? <>{formatNumber(total)} <small>{text.currency}</small></> : '—'}</strong>
                 <div className="cost-breakdown">
                   <span>{text.materialCost}<b>{estimate ? money(estimate.materialCost) : '—'}</b></span>
                   <span>{text.machineCost}<b>{estimate ? money(estimate.machineCost) : '—'}</b></span>
@@ -447,14 +451,16 @@ export default function StudioPage() {
                 <p>{estimate ? text.weightDetails(formatNumber(estimate.weightGrams, 1), formatNumber(selectedMaterial.rate, 0)) : text.noEstimate}</p>
                 {estimate && (
                   <div className="estimate-action">
+                    {(pricing.setupFee > 0 || pricing.minimumPrice > 0) && <p>{[pricing.setupFee > 0 && text.setupFee(formatNumber(pricing.setupFee, 0)), pricing.minimumPrice > 0 && text.minimumPrice(formatNumber(pricing.minimumPrice, 0))].filter(Boolean).join(' · ')}</p>}
+                    <OrderExtras text={text} value={extras} onChange={setExtras} />
                     <p>{text.orderFileNote}</p>
-                    <button className="primary-button estimate-button" disabled={orderState === 'saving' || orderState === 'saved'} onClick={orderFile}>{orderState === 'saving' ? text.orderSaving : text.orderThisFile}</button>
+                    <button className="primary-button estimate-button" disabled={!pricing.acceptingOrders || orderState === 'saving' || orderState === 'saved'} onClick={orderFile}>{orderState === 'saving' ? text.orderSaving : text.orderThisFile}</button>
                     {orderMessage && <p role="status" className="studio-order-message">{orderMessage}</p>}
                   </div>
                 )}
               </div>
             )}
-            <p className="fine-print">{text.estimateNote} · {text.hourlyRate(formatNumber(MACHINE_HOURLY_RATE, 0))}</p>
+            <p className="fine-print">{text.estimateNote} · {text.hourlyRate(formatNumber(pricing.machineHourlyRate, 0))}</p>
           </section>
 
           <div className="privacy-note"><ShieldIcon size={18} /><p><strong>{text.privacyTitle}</strong><br />{text.privacyBody}</p></div>

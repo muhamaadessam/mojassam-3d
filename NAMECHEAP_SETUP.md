@@ -5,6 +5,7 @@ Production: https://mojassam3d.muhammadessam.me
 Run Node.js 24 in cPanel, production mode. Build with `npm ci && npm run build`.
 Deploy `.next/standalone`, `.next/static`, and `public` in an app directory outside the document root.
 Use `server.cjs` as the Passenger startup file. Set `APP_ORIGIN=https://mojassam3d.muhammadessam.me` and `DATA_DIRECTORY=/home/konobbue/mojassam-data`.
+Set `ADMIN_EMAILS` to the shop owner's email (comma-separated for several). That account signs up normally on the site, then opens `/admin` to manage orders, gram prices, machine-hour rate, colors, and ready designs. Without it nobody can open the dashboard.
 `APP_ORIGIN` is required in production: without it every sign-in, profile change, and order is rejected (403) and the log says so.
 Login rate limits use the last `X-Forwarded-For` entry that the host's proxy adds, so the app must only be reachable through that proxy.
 Back up the entire data directory using SQLite's backup API or while the app is stopped; never overwrite it during deployment.
