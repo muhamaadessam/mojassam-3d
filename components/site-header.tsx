@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import AuthNav from '@/app/account/auth-nav';
+import LogoMark from './logo-mark';
 import type { Copy } from '@/lib/copy';
 import type { LanguageKey } from '@/lib/language-config';
 
@@ -17,7 +18,7 @@ export default function SiteHeader({ language, text, nav, onToggleLanguage, onUp
   return (
     <header className="topbar">
       <Link className="brand-lockup" href="/">
-        <div className="brand-mark" aria-hidden="true">◎</div>
+        <div className="brand-mark" aria-hidden="true"><LogoMark size={30} /></div>
         <div><p className="eyebrow">3D WORKSPACE</p><h1>Mojassam 3D</h1></div>
       </Link>
       <nav className="topbar-nav" aria-label={language === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'}>
