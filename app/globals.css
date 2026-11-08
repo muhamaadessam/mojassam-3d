@@ -542,3 +542,8 @@ a.primary-button { display: inline-flex; align-items: center; justify-content: c
   .admin-order-head .order-thumb { --thumb: 48px; grid-row: span 2; }
   .admin-order-head .order-status { grid-column: 2 / -1; }
 }
+
+/* Customer edit/delete on pending orders. */
+.order-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.order-actions .ghost-button { padding: 6px 12px; font-size: 12px; }
+.order-actions-error { flex-basis: 100%; margin: 0; color: var(--color-danger-text) !important; font-size: 12px; }

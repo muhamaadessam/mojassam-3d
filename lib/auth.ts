@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, 
 CREATE TABLE IF NOT EXISTS order_files (id TEXT PRIMARY KEY, order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE, kind TEXT NOT NULL, name TEXT NOT NULL, stored TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS order_files_order ON order_files(order_id);`);
   // Columns added after the first release; ALTER fails harmlessly once they exist.
-  for (const column of ['quantity INTEGER NOT NULL DEFAULT 1', "phone TEXT NOT NULL DEFAULT ''", "customer_note TEXT NOT NULL DEFAULT ''", 'final_price REAL', "admin_note TEXT NOT NULL DEFAULT ''", 'updated_at TEXT']) {
+  for (const column of ['quantity INTEGER NOT NULL DEFAULT 1', "phone TEXT NOT NULL DEFAULT ''", "customer_note TEXT NOT NULL DEFAULT ''", 'final_price REAL', "admin_note TEXT NOT NULL DEFAULT ''", 'updated_at TEXT', 'unit_price REAL', 'unit_hours REAL']) {
     try { db.exec(`ALTER TABLE orders ADD COLUMN ${column}`); } catch { /* already added */ }
   }
   database = db;
