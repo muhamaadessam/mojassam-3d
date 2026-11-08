@@ -41,6 +41,11 @@ export type Dimensions = { x: number; y: number; z: number };
 
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const MAX_QUANTITY = 50;
+/** Designs in one order, and part files in one design (a model split into pieces that print separately). */
+export const MAX_ORDER_ITEMS = 10;
+export const MAX_ITEM_PARTS = 20;
+/** Everything uploaded with one order. The host's request-size limit must allow it (see NAMECHEAP_SETUP.md). */
+export const MAX_ORDER_UPLOAD = 100 * 1024 * 1024;
 /** Images arrive already shrunk and re-encoded as WebP by the browser; this is a safety cap. */
 export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 /** Reference photos a customer can attach to one order. */

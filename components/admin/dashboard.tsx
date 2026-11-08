@@ -187,7 +187,10 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const color = pricing.colors.find((item) => item.id === order.color);
-  const design = order.design_id ? pricing.designs.find((item) => item.id === order.design_id) : undefined;
+  const first = order.items[0];
+  const firstDesign = first?.design_id ? pricing.designs.find((item) => item.id === first.design_id) : undefined;
+  const multiple = order.items.length > 1;
+  const hasModels = order.items.some((item) => item.files.some((file) => file.kind === 'model'));
   const customer = `${order.first_name} ${order.last_name}`.trim() || order.email;
   const phoneDigits = order.phone.replace(/[^\d]/g, '');
   const whatsapp = phoneDigits ? `https://wa.me/${phoneDigits.startsWith('0') ? `2${phoneDigits}` : phoneDigits}` : '';
@@ -224,10 +227,10 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
   return (
     <article className={`admin-order ${open ? 'open' : ''}`}>
       <button className="admin-order-head" onClick={onToggle} aria-expanded={open}>
-        <OrderThumb orderId={order.id} files={order.files} color={color?.hex} image={design?.images[0]} label={order.design_name} />
+        <OrderThumb orderId={order.id} files={first?.files ?? []} color={pricing.colors.find((item) => item.id === first?.color)?.hex} image={firstDesign?.images[0]} label={first?.name ?? order.design_name} />
         <span className={`order-status status-${order.status}`}>{STATUS_AR[order.status] ?? order.status}</span>
-        <span className="admin-order-title"><strong>{order.design_name}{order.quantity > 1 ? ` × ${order.quantity}` : ''}</strong><small><bdi>{customer}</bdi> · <bdi>{date(order.created_at)}</bdi></small></span>
-        <span className="admin-order-spec">{color && <i className="admin-swatch" style={{ background: color.hex }} />}{order.material} · {order.infill}%</span>
+        <span className="admin-order-title"><strong>{multiple ? `${order.items.length} تصميمات: ${order.design_name}` : `${order.design_name}${order.quantity > 1 ? ` × ${order.quantity}` : ''}`}</strong><small><bdi>{customer}</bdi> · <bdi>{date(order.created_at)}</bdi></small></span>
+        <span className="admin-order-spec">{multiple ? `${order.quantity} قطعة` : <>{color && <i className="admin-swatch" style={{ background: color.hex }} />}{order.material} · {order.infill}%</>}</span>
         <span className="admin-order-price">{order.final_price != null ? money(order.final_price) : <>{money(order.estimated_price)} <small>مبدئي</small></>}</span>
       </button>
       {open && (
@@ -235,12 +238,13 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
           <dl className="admin-order-facts">
             <div><dt>العميل</dt><dd>{customer}<br /><a href={`mailto:${order.email}`} dir="ltr">{order.email}</a></dd></div>
             <div><dt>الموبايل</dt><dd>{order.phone ? <><a href={`tel:${order.phone}`} dir="ltr">{order.phone}</a>{whatsapp && <> · <a href={whatsapp} target="_blank" rel="noreferrer">واتساب</a></>}</> : '—'}</dd></div>
-            <div><dt>المواصفات</dt><dd>{order.material} · {color ? color.ar : order.color} · حشو {order.infill}% · {order.quantity} قطعة</dd></div>
+            <div><dt>المواصفات</dt><dd>{multiple ? `${order.items.length} تصميمات · ${order.quantity} قطعة` : `${order.material} · ${color ? color.ar : order.color} · حشو ${order.infill}% · ${order.quantity} قطعة`}</dd></div>
             <div><dt>وقت الطباعة المتوقع</dt><dd>{order.estimated_hours == null ? '—' : `${formatNumber(order.estimated_hours, 2)} ساعة`}</dd></div>
             <div><dt>السعر المبدئي</dt><dd>{money(order.estimated_price)}</dd></div>
-            <div><dt>نوع الطلب</dt><dd>{order.design_id ? 'تصميم جاهز' : order.files.some((file) => file.kind === 'model') ? 'ملف مرفوع' : 'ملف مرفوع — طلب قديم بدون ملف، اطلبه من العميل'}</dd></div>
+            <div><dt>نوع الطلب</dt><dd>{order.design_id ? 'تصميم جاهز' : hasModels ? 'ملفات مرفوعة' : 'ملف مرفوع — طلب قديم بدون ملف، اطلبه من العميل'}</dd></div>
             {order.customer_note && <div className="wide"><dt>ملاحظة العميل</dt><dd>{order.customer_note}</dd></div>}
-            {order.files.length > 0 && <div className="wide"><dt>المرفقات</dt><dd><OrderFiles order={order} /></dd></div>}
+            {hasModels && <div className="wide"><dt>{multiple ? 'التصميمات' : 'الملفات'}</dt><dd><OrderItems order={order} pricing={pricing} /></dd></div>}
+            {order.files.length > 0 && <div className="wide"><dt>صور من العميل</dt><dd><OrderPhotos order={order} /></dd></div>}
             {order.updated_at && order.updated_at !== order.created_at && <div><dt>آخر تحديث</dt><dd><bdi>{date(order.updated_at)}</bdi></dd></div>}
           </dl>
           <div className="admin-order-edit">
@@ -260,17 +264,35 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
   );
 }
 
-/** The customer's model (download) and reference photos (open full size). */
-function OrderFiles({ order }: { order: { id: string; files: AdminOrderRow['files'] } }) {
+/** Each design in the order: its picture, settings, and a download link per part file. */
+function OrderItems({ order, pricing }: { order: AdminOrderRow; pricing: Pricing }) {
   const href = (fileId: string) => `/api/orders/${order.id}/files/${fileId}`;
-  const model = order.files.filter((file) => file.kind === 'model');
-  const photos = order.files.filter((file) => file.kind === 'image');
+  const multiple = order.items.length > 1;
   return (
-    <div className="order-files">
-      {model.map((file) => <a key={file.id} className="order-file-download" href={href(file.id)} download={file.name}><span dir="ltr">{file.name}</span><small dir="ltr">{formatBytes(file.size)}</small><b>تحميل</b></a>)}
-      {photos.length > 0 && <div className="order-file-photos">{photos.map((file) => <a key={file.id} href={href(file.id)} target="_blank" rel="noreferrer"><img src={href(file.id)} alt={file.name} loading="lazy" /></a>)}</div>}
+    <div className="admin-items">
+      {order.items.map((item) => {
+        const color = pricing.colors.find((entry) => entry.id === item.color);
+        const models = item.files.filter((file) => file.kind === 'model');
+        const preview = item.files.find((file) => file.kind === 'preview');
+        return (
+          <div className={`admin-item ${multiple ? 'boxed' : ''}`} key={item.id}>
+            {multiple && <OrderThumb orderId={order.id} files={item.files} color={color?.hex} label={item.name} linked small />}
+            <div className="order-files">
+              {multiple && <span className="admin-item-specs"><strong dir="auto">{item.name}</strong> · {item.material} · {color ? color.ar : item.color} · حشو {item.infill}% · {item.quantity} قطعة{item.unit_price != null ? ` · ${money(item.unit_price)} للقطعة` : ''}</span>}
+              {models.map((file, index) => <a key={file.id} className="order-file-download" href={href(file.id)} download={file.name}>{models.length > 1 && <small>جزء {index + 1}</small>}<span dir="ltr">{file.name}</span><small dir="ltr">{formatBytes(file.size)}</small><b>تحميل</b></a>)}
+              {!multiple && preview && <a className="admin-preview-link" href={href(preview.id)} target="_blank" rel="noreferrer">عرض صورة التصميم</a>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+/** Reference photos the customer attached to the order (open full size). */
+function OrderPhotos({ order }: { order: { id: string; files: AdminOrderRow['files'] } }) {
+  const href = (fileId: string) => `/api/orders/${order.id}/files/${fileId}`;
+  return <div className="order-file-photos">{order.files.map((file) => <a key={file.id} href={href(file.id)} target="_blank" rel="noreferrer"><img src={href(file.id)} alt={file.name} loading="lazy" /></a>)}</div>;
 }
 
 // ---------------- Pricing & time ----------------
