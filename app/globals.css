@@ -252,19 +252,14 @@ select:focus-visible, .auth-form input:focus-visible, .profile-form input:focus-
 .topbar-nav a[aria-current='page']::after { position: absolute; inset-inline: 12px; bottom: -15px; height: 2px; border-radius: 2px; background: var(--color-brand); content: ''; }
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; min-width: 0; margin-inline-start: auto; }
-.topbar-note { display: flex; align-items: center; gap: 8px; margin-inline-end: 8px; color: var(--color-text-subtle); font-size: 12px; white-space: nowrap; }
-.online-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--color-brand); box-shadow: 0 0 0 3px var(--color-brand-surface-strong); }
 .topbar-lang, .topbar-link { display: inline-flex; align-items: center; height: 36px; border: 1px solid transparent; border-radius: 9px; padding: 0 11px; color: var(--color-text-secondary); background: transparent; font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; transition: color .2s ease, background-color .2s ease, border-color .2s ease; }
 .topbar-lang:hover, .topbar-link:hover { color: var(--color-text-primary); background: color-mix(in srgb, var(--color-text-muted) 8%, transparent); }
 .account-link { border-color: var(--color-border-strong); }
 .account-menu { display: flex; align-items: center; gap: 9px; height: 36px; min-width: 0; border: 1px solid var(--color-border-strong); border-radius: 999px; padding-inline: 4px 12px; color: var(--color-text-heading); font-size: 13px; font-weight: 700; text-decoration: none; transition: border-color .2s ease, background-color .2s ease; }
 .account-menu:hover { border-color: var(--color-brand-border-strong); background: var(--color-brand-surface); }
 .account-menu-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.topbar-upload { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; font-size: 13px; white-space: nowrap; box-shadow: none; }
-.topbar-upload svg { flex: 0 0 auto; }
 
 /* Shed the lowest-priority items first as the bar narrows. */
-@media (max-width: 1240px) { .topbar-note { display: none; } }
 @media (max-width: 1060px) { .topbar-inner { gap: 18px; } .topbar-nav a { padding-inline: 9px; } }
 /* Narrow screens: links drop to a second row instead of disappearing. */
 @media (max-width: 900px) {
@@ -280,9 +275,7 @@ select:focus-visible, .auth-form input:focus-visible, .profile-form input:focus-
   .topbar-lang, .topbar-link { padding: 0 9px; }
   .account-menu { padding: 3px; }
   .account-menu-name { display: none; }
-  .topbar-upload { padding: 0 11px; }
 }
-@media (max-width: 370px) { .topbar-upload span { display: none; } .topbar-upload { width: 36px; justify-content: center; padding: 0; } }
 
 /* Order extras (quantity, phone, note) */
 .order-extras { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; margin-top: 14px; }
