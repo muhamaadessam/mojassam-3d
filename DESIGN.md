@@ -1,4 +1,4 @@
-# Mojassam 3D visual direction
+# Etba3 Bas (اطبع بس) visual direction
 
 THESIS: The interface is a workbench for inspecting a physical object, not a marketing page; the 3D canvas owns the first viewport.
 OWN-WORLD: Midnight navy surfaces, measured lime calibration marks, cool blue light, thin technical dividers, and compact Arabic controls.
@@ -13,6 +13,10 @@ FORM: Operate / workbench split view; original composition with a deliberately q
 - Use system sans typography and Arabic-first copy; technical formats and units can remain Latin.
 - Motion belongs to the model and camera: orbit, damping, auto-rotate, and fit-to-view. UI motion stays minimal.
 - Every estimate must be labeled preliminary and must not imply slicer accuracy.
+
+## Logo
+
+The logo is the Arabic wordmark "اطبع بس" printed in stacked layers under a 3D-printer nozzle. The master vector is `public/brand/etba3bas-logo.svg`; `components/logo-mark.tsx` uses it as a CSS mask tinted with `--color-brand`, so it always follows the theme. It is the wordmark, so the header shows it alone with no extra name text. Run `npm run icons` after changing it to regenerate the favicon, app icons, and `public/brand/etba3bas-logo.png`.
 
 ## Theme editing
 

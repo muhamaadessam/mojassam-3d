@@ -1,4 +1,6 @@
-# Mojassam 3D — Namecheap
+# Etba3 Bas (اطبع بس) — Namecheap
+
+The app was renamed from Mojassam 3D. Server paths, the domain, cookie names, and the database file still use the old `mojassam` name on purpose, so existing sessions and deploys keep working.
 
 Production: https://mojassam3d.muhammadessam.me
 

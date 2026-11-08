@@ -1,6 +1,6 @@
-# Mojassam 3D (مجسّم 3D)
+# اطبع بس (Etba3 Bas)
 
-> Mojassam 3D is a bilingual (Arabic / English) browser tool for 3D printing in Egypt. Upload an STL, OBJ, or 3MF file (up to 50 MB), inspect the model in 3D, check its dimensions, and get a preliminary print-cost estimate in Egyptian pounds (EGP). Files are parsed locally in the browser and are never uploaded or stored.
+> اطبع بس (Etba3 Bas, formerly Mojassam 3D) is a bilingual (Arabic / English) browser tool for 3D printing in Egypt. Upload an STL, OBJ, or 3MF file (up to 50 MB), inspect the model in 3D, check its dimensions, and get a preliminary print-cost estimate in Egyptian pounds (EGP). Files are parsed locally in the browser and are never uploaded or stored.
 
 ## Pages
 

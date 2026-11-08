@@ -1,21 +1,18 @@
-// Mojassam 3D mark: a cube built from print layers, with the nozzle above it.
-// Drawn on a 64px grid; colors come from the design tokens so it follows the theme.
-// Keep in sync with scripts/generate-icons.mjs, which renders the favicon and app icons (rerun it after changes).
+// "اطبع بس" logo: the Arabic wordmark printed in layers under a 3D-printer nozzle.
+// The shape lives in public/brand/etba3bas-logo.svg and is used as a mask, so the color
+// comes from the design tokens (--color-brand by default) and follows the theme.
+// scripts/generate-icons.mjs renders the favicon and app icons from the same file (rerun it after changes).
 
-const LAYER_OFFSETS = [3, 8, 13, 18, 23];
+export const LOGO_SRC = '/brand/etba3bas-logo.svg';
+/** Width / height of the logo's viewBox (1054 × 994). */
+export const LOGO_RATIO = 1054 / 994;
 
 export default function LogoMark({ size = 28, className }: { size?: number; className?: string }) {
   return (
-    <svg className={className} width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
-      <polygon points="32,16 50,26 32,36 14,26" fill="var(--color-brand)" />
-      <g stroke="var(--color-brand)" strokeWidth="3.2" strokeLinecap="round">
-        {LAYER_OFFSETS.map((offset) => <path key={`l${offset}`} d={`M14 ${26 + offset} L32 ${36 + offset}`} />)}
-      </g>
-      <g stroke="var(--color-brand)" strokeOpacity="0.55" strokeWidth="3.2" strokeLinecap="round">
-        {LAYER_OFFSETS.map((offset) => <path key={`r${offset}`} d={`M32 ${36 + offset} L50 ${26 + offset}`} />)}
-      </g>
-      <path d="M32 3 V8" stroke="var(--color-info)" strokeWidth="3" strokeLinecap="round" />
-      <polygon points="27,8 37,8 32,13" fill="var(--color-info)" />
-    </svg>
+    <span
+      className={['logo-mark', className].filter(Boolean).join(' ')}
+      style={{ width: Math.round(size * LOGO_RATIO), height: size }}
+      aria-hidden="true"
+    />
   );
 }

@@ -2,10 +2,10 @@
 import { getReadyPrice, orderTotal, publicCatalog, type Pricing } from './catalog';
 
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://mojassam3d.muhammadessam.me').replace(/\/$/, '');
-export const SITE_NAME = 'Mojassam 3D';
-export const SITE_NAME_AR = 'مجسّم 3D';
+export const SITE_NAME = 'Etba3 Bas';
+export const SITE_NAME_AR = 'اطبع بس';
 
-export const SITE_TITLE_AR = 'معاينة ملفات 3D وحساب تكلفة الطباعة ثلاثية الأبعاد | Mojassam 3D';
+export const SITE_TITLE_AR = 'معاينة ملفات 3D وحساب تكلفة الطباعة ثلاثية الأبعاد | اطبع بس';
 export const SITE_DESCRIPTION_AR =
   'ارفع ملف STL أو OBJ أو 3MF، عاين المجسم ثلاثي الأبعاد داخل المتصفح، راجع الأبعاد، واحسب تقديرًا مبدئيًا لتكلفة الطباعة 3D بالجنيه المصري — الملف لا يغادر جهازك.';
 export const SITE_DESCRIPTION_EN =
@@ -40,7 +40,7 @@ export function getFaq(pricing: Pricing) {
   const hourly = pricing.machineHourlyRate;
   return {
   ar: [
-    { q: 'إيه هو Mojassam 3D؟', a: 'Mojassam 3D أداة في المتصفح بتخليك ترفع ملف 3D، تعاينه وتتحرك حواليه، تراجع أبعاده، وتاخد تقديرًا مبدئيًا لتكلفة الطباعة ثلاثية الأبعاد قبل ما تطلب.' },
+    { q: 'إيه هو اطبع بس؟', a: 'اطبع بس أداة في المتصفح بتخليك ترفع ملف 3D، تعاينه وتتحرك حواليه، تراجع أبعاده، وتاخد تقديرًا مبدئيًا لتكلفة الطباعة ثلاثية الأبعاد قبل ما تطلب.' },
     { q: 'إيه صيغ الملفات المدعومة؟', a: 'بندعم ملفات STL وOBJ و3MF بحجم يصل إلى 50 ميجابايت.' },
     { q: 'هل ملفي بيترفع على سيرفر؟', a: 'لا. الملف بيتقرا ويتعرض محليًا على جهازك داخل المتصفح، ومش بيترفع ولا بيتحفظ على أي سيرفر.' },
     { q: 'إزاي بيتحسب سعر الطباعة 3D؟', a: `السعر المبدئي = وزن الخامة بالجرام × سعر الجرام (${ratesAr}) + ساعات تشغيل الماكينة × ${hourly} ج.م للساعة. الوزن بيتحسب من حجم المجسم ونسبة الحشو (Infill).` },
@@ -48,7 +48,7 @@ export function getFaq(pricing: Pricing) {
     { q: 'هل السعر نهائي؟', a: 'لا، ده تقدير مبدئي واضح للمساعدة في القرار. السعر النهائي ممكن يختلف بعد مراجعة الملف وإعدادات التقطيع (Slicing).' },
   ],
   en: [
-    { q: 'What is Mojassam 3D?', a: 'Mojassam 3D is a browser tool that lets you upload a 3D file, orbit around it, check its dimensions, and get a preliminary 3D-printing cost estimate before you order.' },
+    { q: 'What is Etba3 Bas (اطبع بس)?', a: 'Etba3 Bas is a browser tool that lets you upload a 3D file, orbit around it, check its dimensions, and get a preliminary 3D-printing cost estimate before you order.' },
     { q: 'Which file formats are supported?', a: 'STL, OBJ, and 3MF files up to 50 MB.' },
     { q: 'Is my file uploaded to a server?', a: 'No. The file is read and rendered locally in your browser and is never uploaded or stored on a server.' },
     { q: 'How is the 3D-printing price calculated?', a: `Preliminary price = material weight in grams × price per gram (${ratesEn}) + machine hours × ${hourly} EGP per hour. Weight is derived from the model volume and infill percentage.` },
@@ -69,18 +69,18 @@ export function homeJsonLd(pricing: Pricing) {
       {
         '@type': 'Organization',
         '@id': org,
-        name: SITE_NAME,
-        alternateName: SITE_NAME_AR,
+        name: SITE_NAME_AR,
+        alternateName: SITE_NAME,
         url: SITE_URL,
-        logo: `${SITE_URL}/icons/icon-512.png`,
+        logo: `${SITE_URL}/brand/etba3bas-logo.png`,
         areaServed: { '@type': 'Country', name: 'Egypt' },
       },
       {
         '@type': 'WebSite',
         '@id': `${SITE_URL}/#website`,
         url: SITE_URL,
-        name: SITE_NAME,
-        alternateName: SITE_NAME_AR,
+        name: SITE_NAME_AR,
+        alternateName: SITE_NAME,
         description: SITE_DESCRIPTION_AR,
         inLanguage: ['ar', 'en'],
         publisher: { '@id': org },
