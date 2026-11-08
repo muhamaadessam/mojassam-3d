@@ -1,5 +1,5 @@
 import { getDb } from './auth';
-import { DEFAULT_PRICING, type Material, type Pricing, type PrintColor, type ReadyDesign } from './catalog';
+import { DEFAULT_PRICING, MAX_DESIGN_IMAGES, type Material, type Pricing, type PrintColor, type ReadyDesign } from './catalog';
 
 const KEY = 'pricing';
 
@@ -53,8 +53,13 @@ export function parsePricing(input: unknown): Pricing {
     const field = `تصميم ${index + 1}`;
     const material = id(item.material, `خامة ${field}`);
     if (!materialIds.has(material)) fail(`خامة ${field} غير موجودة.`);
-    const image = typeof item.image === 'string' ? item.image.trim() : '';
-    if (image && !/^(\/[\w\-./]+|https:\/\/[^\s"'<>]+)$/.test(image)) fail(`رابط صورة ${field} غير صالح.`);
+    // Older saves kept a single `image` link.
+    const rawImages = Array.isArray(item.images) ? item.images : typeof item.image === 'string' && item.image.trim() ? [item.image] : [];
+    if (rawImages.length > MAX_DESIGN_IMAGES) fail(`الحد الأقصى ${MAX_DESIGN_IMAGES} صور لكل تصميم: ${field}`);
+    const images = rawImages.map((image) => {
+      const value = typeof image === 'string' ? image.trim() : '';
+      return /^(\/[\w\-./]+|https:\/\/[^\s"'<>]+)$/.test(value) ? value : fail(`رابط صورة ${field} غير صالح.`);
+    });
     return {
       id: id(item.id, field),
       nameAr: text(item.nameAr, 120, `اسم ${field}`),
@@ -68,7 +73,7 @@ export function parsePricing(input: unknown): Pricing {
       weightGrams: num(item.weightGrams, 0.1, 100_000, `وزن ${field}`),
       printHours: num(item.printHours, 0.05, 1000, `ساعات ${field}`),
       artClass: typeof item.artClass === 'string' && /^[a-z-]{0,30}$/.test(item.artClass) ? item.artClass : 'organizer',
-      ...(image ? { image } : {}),
+      images,
       enabled: bool(item.enabled),
     };
   }), 'التصميمات');

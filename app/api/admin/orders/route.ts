@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   try {
     const body = await readBody(request);
     if (body.action === 'delete') {
-      deleteOrder(body.id);
+      await deleteOrder(body.id);
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ order: updateOrder(body) });

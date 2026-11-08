@@ -468,3 +468,39 @@ select:focus-visible, .auth-form input:focus-visible, .profile-form input:focus-
 .empty-orders p { margin: 0; }
 @media (max-width: 560px) { .orders-page { margin-top: 24px; } .orders-page-header { align-items: flex-start; flex-direction: column; } }
 a.primary-button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+/* Product photo gallery: swipe/scroll between photos, first one is the cover. */
+.product-gallery { position: relative; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; background: var(--color-canvas); }
+.product-gallery::-webkit-scrollbar { display: none; }
+.product-gallery .product-image { flex: 0 0 100%; scroll-snap-align: start; }
+.product-gallery-wrap { position: relative; }
+.product-gallery-count { position: absolute; bottom: 10px; inset-inline-end: 10px; padding: 3px 8px; border-radius: 999px; background: var(--color-surface-overlay); color: var(--color-text-primary); font-size: 11px; pointer-events: none; }
+
+/* Photo picker shared by the studio order form and the dashboard. */
+.image-picker { display: grid; gap: 8px; text-align: start; }
+.image-picker-label { color: var(--color-text-secondary); font-size: 13px; }
+.image-picker-label small, .design-images > span small { color: var(--color-text-subtle); font-size: 11px; }
+.image-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+.image-picker-grid figure { position: relative; margin: 0; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-canvas); }
+.image-picker-grid figure.cover { border-color: var(--color-brand-border-strong); }
+.image-picker-grid img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.image-picker-grid figure button { position: absolute; top: 4px; inset-inline-end: 4px; min-width: 22px; height: 22px; padding: 0 6px; border: 0; border-radius: 999px; background: var(--color-surface-overlay); color: var(--color-text-primary); font-size: 13px; line-height: 22px; cursor: pointer; }
+.image-picker-grid figure button.make-cover { inset-inline-end: auto; inset-inline-start: 4px; font-size: 10px; }
+.image-picker-add { display: grid; place-items: center; aspect-ratio: 1; padding: 6px; border: 1px dashed var(--color-border-strong); border-radius: 10px; color: var(--color-text-muted); font-size: 12px; text-align: center; cursor: pointer; }
+.image-picker-add:hover { border-color: var(--color-brand-border-strong); color: var(--color-brand); }
+.image-picker-add.busy { cursor: progress; opacity: .7; }
+.image-picker-add input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.image-picker-hint { color: var(--color-text-subtle); font-size: 12px; }
+.image-picker-error { color: var(--color-danger-text); font-size: 12px; }
+.design-images { display: grid; gap: 8px; }
+
+/* Order attachments, in the dashboard and the customer's order history. */
+.order-files { display: grid; gap: 10px; }
+.order-file-download { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-self: start; max-width: 100%; padding: 8px 12px; border: 1px solid var(--color-brand-border); border-radius: 10px; background: var(--color-brand-surface-soft); color: var(--color-text-primary); text-decoration: none; }
+.order-file-download span { overflow-wrap: anywhere; }
+.order-file-download small { color: var(--color-text-subtle); }
+.order-file-download b { color: var(--color-brand); }
+.order-file-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.order-file-photos a:not(.order-file-chip) { display: block; width: 64px; height: 64px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px; }
+.order-file-photos img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.order-file-chip { align-self: center; padding: 4px 10px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-secondary); font-size: 12px; text-decoration: none; overflow-wrap: anywhere; }

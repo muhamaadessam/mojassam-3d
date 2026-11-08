@@ -23,3 +23,11 @@ export function formatBytes(bytes: number) {
 export function formatNumber(value: number, digits = 1) {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(value);
 }
+
+/**
+ * Dates in the page's language but always with Latin digits (2026/11/08, not ٢٠٢٦/١١/٠٨).
+ * `-u-nu-latn` keeps Arabic month names while forcing Western numerals.
+ */
+export function formatDate(value: string | Date, language: 'ar' | 'en' = 'ar', withTime = false) {
+  return new Date(value).toLocaleString(language === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' });
+}

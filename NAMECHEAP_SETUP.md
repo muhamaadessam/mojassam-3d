@@ -8,6 +8,7 @@ Use `server.cjs` as the Passenger startup file. Set `APP_ORIGIN=https://mojassam
 Set `ADMIN_EMAILS` to the shop owner's email (comma-separated for several). That account signs up normally on the site, then opens `/admin` to manage orders, gram prices, machine-hour rate, colors, and ready designs. Without it nobody can open the dashboard.
 `APP_ORIGIN` is required in production: without it every sign-in, profile change, and order is rejected (403) and the log says so.
 Login rate limits use the last `X-Forwarded-For` entry that the host's proxy adds, so the app must only be reachable through that proxy.
+Customer model files and photos are stored in `DATA_DIRECTORY/uploads/orders/<order id>/`, and product photos in `DATA_DIRECTORY/uploads/designs/`. Orders accept uploads up to about 100MB, so the host's request-size limit (Apache `LimitRequestBody`) must allow that.
 Back up the entire data directory using SQLite's backup API or while the app is stopped; never overwrite it during deployment.
 Accounts, password hashes, sessions, profiles, and orders live in SQLite on Namecheap. No Supabase connection is used. Sessions require HTTPS. Google OAuth and email verification/recovery need separate configuration; the current sign-in uses email and password.
 Existing Supabase accounts/orders have not been migrated. Old remote data has not been deleted.

@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import LogoMark from '@/components/logo-mark';
-import { estimateCustomPrint, getReadyPrice, orderTotal, type Material, type Pricing, type PrintColor, type ReadyDesign } from '@/lib/catalog';
+import { toWebp } from '@/lib/image-webp';
+import { formatBytes, formatDate, formatNumber } from '@/lib/model-file';
+import { estimateCustomPrint, getReadyPrice, MAX_DESIGN_IMAGES, orderTotal, type Material, type Pricing, type PrintColor, type ReadyDesign } from '@/lib/catalog';
 import { ORDER_STATUS } from '@/lib/copy';
 import type { AdminOrderRow } from '@/lib/orders';
 
@@ -11,8 +13,8 @@ const STATUSES = ['pending', 'confirmed', 'printing', 'ready', 'completed', 'can
 const STATUS_AR = ORDER_STATUS.ar;
 type Tab = 'orders' | 'pricing' | 'catalog';
 
-const money = (value: number | null | undefined) => (value == null ? '—' : `${value.toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ج.م`);
-const date = (iso: string) => new Date(iso).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+const money = (value: number | null | undefined) => (value == null ? '—' : `${formatNumber(value, 2)} ج.م`);
+const date = (iso: string) => formatDate(iso, 'ar', true);
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
 /** Customer-facing amount: the confirmed price if set, otherwise the estimate. */
 const amount = (order: AdminOrderRow) => order.final_price ?? order.estimated_price ?? 0;
@@ -135,7 +137,7 @@ function OrdersPanel({ orders, pricing, onChange, onRefresh }: { orders: AdminOr
     <section className="admin-panel">
       <div className="admin-stats">
         <Stat label="طلبات جديدة" value={String(stats.pending)} accent={stats.pending > 0} />
-        <Stat label="قيد التنفيذ" value={String(stats.inProgress)} hint={`${stats.hours.toLocaleString('ar-EG', { maximumFractionDigits: 1 })} ساعة طباعة مفتوحة`} />
+        <Stat label="قيد التنفيذ" value={String(stats.inProgress)} hint={`${formatNumber(stats.hours, 1)} ساعة طباعة مفتوحة`} />
         <Stat label="جاهز للاستلام" value={String(stats.ready)} />
         <Stat label="طلبات الشهر" value={String(stats.month)} />
         <Stat label="قيمة الطلبات المفتوحة" value={money(stats.pipeline)} />
@@ -221,7 +223,7 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
     <article className={`admin-order ${open ? 'open' : ''}`}>
       <button className="admin-order-head" onClick={onToggle} aria-expanded={open}>
         <span className={`order-status status-${order.status}`}>{STATUS_AR[order.status] ?? order.status}</span>
-        <span className="admin-order-title"><strong>{order.design_name}{order.quantity > 1 ? ` × ${order.quantity}` : ''}</strong><small>{customer} · {date(order.created_at)}</small></span>
+        <span className="admin-order-title"><strong>{order.design_name}{order.quantity > 1 ? ` × ${order.quantity}` : ''}</strong><small><bdi>{customer}</bdi> · <bdi>{date(order.created_at)}</bdi></small></span>
         <span className="admin-order-spec">{color && <i className="admin-swatch" style={{ background: color.hex }} />}{order.material} · {order.infill}%</span>
         <span className="admin-order-price">{order.final_price != null ? money(order.final_price) : <>{money(order.estimated_price)} <small>مبدئي</small></>}</span>
       </button>
@@ -231,11 +233,12 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
             <div><dt>العميل</dt><dd>{customer}<br /><a href={`mailto:${order.email}`} dir="ltr">{order.email}</a></dd></div>
             <div><dt>الموبايل</dt><dd>{order.phone ? <><a href={`tel:${order.phone}`} dir="ltr">{order.phone}</a>{whatsapp && <> · <a href={whatsapp} target="_blank" rel="noreferrer">واتساب</a></>}</> : '—'}</dd></div>
             <div><dt>المواصفات</dt><dd>{order.material} · {color ? color.ar : order.color} · حشو {order.infill}% · {order.quantity} قطعة</dd></div>
-            <div><dt>وقت الطباعة المتوقع</dt><dd>{order.estimated_hours?.toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ساعة</dd></div>
+            <div><dt>وقت الطباعة المتوقع</dt><dd>{order.estimated_hours == null ? '—' : `${formatNumber(order.estimated_hours, 2)} ساعة`}</dd></div>
             <div><dt>السعر المبدئي</dt><dd>{money(order.estimated_price)}</dd></div>
-            <div><dt>نوع الطلب</dt><dd>{order.design_id ? 'تصميم جاهز' : 'ملف مرفوع — اطلب الملف من العميل'}</dd></div>
+            <div><dt>نوع الطلب</dt><dd>{order.design_id ? 'تصميم جاهز' : order.files.some((file) => file.kind === 'model') ? 'ملف مرفوع' : 'ملف مرفوع — طلب قديم بدون ملف، اطلبه من العميل'}</dd></div>
             {order.customer_note && <div className="wide"><dt>ملاحظة العميل</dt><dd>{order.customer_note}</dd></div>}
-            {order.updated_at && order.updated_at !== order.created_at && <div><dt>آخر تحديث</dt><dd>{date(order.updated_at)}</dd></div>}
+            {order.files.length > 0 && <div className="wide"><dt>المرفقات</dt><dd><OrderFiles order={order} /></dd></div>}
+            {order.updated_at && order.updated_at !== order.created_at && <div><dt>آخر تحديث</dt><dd><bdi>{date(order.updated_at)}</bdi></dd></div>}
           </dl>
           <div className="admin-order-edit">
             <label>الحالة<select value={status} onChange={(event) => setStatus(event.target.value)}>{STATUSES.map((item) => <option key={item} value={item}>{STATUS_AR[item]}</option>)}</select></label>
@@ -251,6 +254,19 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
         </div>
       )}
     </article>
+  );
+}
+
+/** The customer's model (download) and reference photos (open full size). */
+function OrderFiles({ order }: { order: { id: string; files: AdminOrderRow['files'] } }) {
+  const href = (fileId: string) => `/api/orders/${order.id}/files/${fileId}`;
+  const model = order.files.filter((file) => file.kind === 'model');
+  const photos = order.files.filter((file) => file.kind === 'image');
+  return (
+    <div className="order-files">
+      {model.map((file) => <a key={file.id} className="order-file-download" href={href(file.id)} download={file.name}><span dir="ltr">{file.name}</span><small dir="ltr">{formatBytes(file.size)}</small><b>تحميل</b></a>)}
+      {photos.length > 0 && <div className="order-file-photos">{photos.map((file) => <a key={file.id} href={href(file.id)} target="_blank" rel="noreferrer"><img src={href(file.id)} alt={file.name} loading="lazy" /></a>)}</div>}
+    </div>
   );
 }
 
@@ -320,8 +336,8 @@ function PricingPanel({ draft, setDraft }: DraftProps) {
         </div>
         {preview && Number.isFinite(preview.price) && (
           <div className="admin-preview">
-            <span>الوزن <b>{preview.weightGrams.toLocaleString('ar-EG', { maximumFractionDigits: 1 })} جم</b></span>
-            <span>الوقت <b>{preview.hours.toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ساعة</b></span>
+            <span>الوزن <b>{formatNumber(preview.weightGrams, 1)} جم</b></span>
+            <span>الوقت <b>{formatNumber(preview.hours, 2)} ساعة</b></span>
             <span>الخامة <b>{money(preview.materialCost)}</b></span>
             <span>الماكينة <b>{money(preview.machineCost)}</b></span>
             <span className="total">السعر للعميل <b>{money(orderTotal(draft, preview.price))}</b></span>
@@ -360,7 +376,7 @@ function CatalogPanel({ draft, setDraft }: DraftProps) {
       </div>
 
       <div className="admin-card">
-        <div className="admin-card-head"><h2>التصميمات الجاهزة</h2><button className="ghost-button" onClick={() => set((pricing) => ({ ...pricing, designs: [...pricing.designs, { id: newId('design'), nameAr: 'تصميم جديد', nameEn: 'New design', descriptionAr: '', descriptionEn: '', categoryAr: '', categoryEn: '', material: pricing.materials[0]?.id ?? 'pla', infill: 20, weightGrams: 50, printHours: 2, artClass: 'organizer', enabled: false }] }))}>+ إضافة تصميم</button></div>
+        <div className="admin-card-head"><h2>التصميمات الجاهزة</h2><button className="ghost-button" onClick={() => set((pricing) => ({ ...pricing, designs: [...pricing.designs, { id: newId('design'), nameAr: 'تصميم جديد', nameEn: 'New design', descriptionAr: '', descriptionEn: '', categoryAr: '', categoryEn: '', material: pricing.materials[0]?.id ?? 'pla', infill: 20, weightGrams: 50, printHours: 2, artClass: 'organizer', images: [], enabled: false }] }))}>+ إضافة تصميم</button></div>
         <div className="admin-designs">
           {draft.designs.map((design, index) => (
             <details className={`admin-design ${design.enabled ? '' : 'disabled'}`} key={design.id}>
@@ -381,7 +397,7 @@ function CatalogPanel({ draft, setDraft }: DraftProps) {
                 <NumberField label="الوزن" suffix="جم" step={1} value={design.weightGrams} onChange={(value) => updateDesign(index, { weightGrams: value })} />
                 <NumberField label="وقت الطباعة" suffix="ساعة" step={0.25} value={design.printHours} onChange={(value) => updateDesign(index, { printHours: value })} />
                 <NumberField label="نسبة الحشو" suffix="%" step={5} min={5} value={design.infill} onChange={(value) => updateDesign(index, { infill: value })} />
-                <label className="admin-field wide"><span>رابط صورة (اختياري)</span><input dir="ltr" value={design.image ?? ''} placeholder="/designs/vase.jpg أو https://…" onChange={(event) => updateDesign(index, { image: event.target.value })} /></label>
+                <DesignImages images={design.images} onChange={(images) => updateDesign(index, { images })} />
               </div>
               <div className="admin-design-actions">
                 <label className="admin-toggle"><input type="checkbox" checked={design.enabled} onChange={(event) => updateDesign(index, { enabled: event.target.checked })} /><span>{design.enabled ? 'ظاهر في المتجر' : 'مخفي من المتجر'}</span></label>
@@ -392,5 +408,54 @@ function CatalogPanel({ draft, setDraft }: DraftProps) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Product photos: upload several at once (converted to WebP first), remove, or pick the cover. */
+function DesignImages({ images, onChange }: { images: string[]; onChange: (images: string[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const upload = async (files: File[]) => {
+    setBusy(true);
+    setError('');
+    try {
+      const form = new FormData();
+      for (const file of files.slice(0, MAX_DESIGN_IMAGES - images.length)) {
+        const webp = await toWebp(file);
+        form.append('images', webp, webp.name);
+      }
+      const response = await fetch('/api/admin/uploads', { method: 'POST', body: form });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'تعذر رفع الصور.');
+      onChange([...images, ...result.urls]);
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : 'تعذر رفع الصور.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-field wide design-images">
+      <span>صور المنتج <small>{images.length}/{MAX_DESIGN_IMAGES} · أول صورة هي الغلاف · بتتحول تلقائيًا لـ WebP مضغوط</small></span>
+      <div className="image-picker-grid">
+        {images.map((src, index) => (
+          <figure key={src} className={index === 0 ? 'cover' : ''}>
+            <img src={src} alt="" />
+            {index > 0 && <button type="button" className="make-cover" onClick={() => onChange([src, ...images.filter((item) => item !== src)])}>غلاف</button>}
+            <button type="button" onClick={() => onChange(images.filter((item) => item !== src))} aria-label="حذف الصورة">×</button>
+          </figure>
+        ))}
+        {images.length < MAX_DESIGN_IMAGES && (
+          <label className={`image-picker-add ${busy ? 'busy' : ''}`}>
+            <input type="file" accept="image/*" multiple disabled={busy} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ''; if (files.length) void upload(files); }} />
+            <span>{busy ? 'جارٍ الرفع…' : '+ رفع صور'}</span>
+          </label>
+        )}
+      </div>
+      {error && <small className="image-picker-error" role="alert">{error}</small>}
+      <small>بعد الرفع اضغط «حفظ التغييرات» عشان الصور تظهر في المتجر.</small>
+    </div>
   );
 }
