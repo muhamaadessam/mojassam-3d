@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { authRequest } from '@/lib/auth-client';
 import { ACCOUNT_COPY } from '@/lib/copy';
 import { useLanguage } from '@/lib/language';
+import LogoMark from '@/components/logo-mark';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function LoginPage() {
           <Link className="auth-back" href="/">{text.backToPreview}</Link>
           <button type="button" className="ghost-button" onClick={toggleLanguage}>{text.language}</button>
         </div>
-        <p className="eyebrow accent" lang="en">MOJASSAM 3D ACCOUNT</p>
+        <LogoMark size={72} className="auth-logo" />
         <h1>{mode === 'login' ? text.loginTitle : text.signupTitle}</h1>
         <p className="auth-intro">{text.authIntro}</p>
         <form className="auth-form" onSubmit={submit}>

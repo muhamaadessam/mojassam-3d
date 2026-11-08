@@ -59,8 +59,8 @@ export default function AdminDashboard({ initialOrders, initialPricing, adminEma
   return (
     <main className="admin-shell">
       <header className="admin-topbar">
-        <Link className="brand-lockup" href="/" aria-label="Mojassam 3D">
-          <span className="brand-mark" aria-hidden="true"><LogoMark size={26} /></span>
+        <Link className="brand-lockup" href="/" aria-label="اطبع بس">
+          <LogoMark size={42} />
           <span className="brand-text"><span className="eyebrow" lang="en">ADMIN</span><span className="brand-name">لوحة التحكم</span></span>
         </Link>
         <nav className="admin-tabs" role="tablist">
@@ -127,7 +127,7 @@ function OrdersPanel({ orders, pricing, onChange, onRefresh }: { orders: AdminOr
     const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-    link.download = `mojassam-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `etba3bas-orders-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   };

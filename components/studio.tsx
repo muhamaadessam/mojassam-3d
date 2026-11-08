@@ -12,6 +12,7 @@ import { COPY, type FileErrorKey } from '@/lib/copy';
 import { formatBytes, formatNumber, getFormat, validateModelFile, type SupportedFormat } from '@/lib/model-file';
 import { clearPendingFile, readPendingFile } from '@/lib/pending-file';
 import { useLanguage } from '@/lib/language';
+import { SITE_NAME, SITE_NAME_AR } from '@/lib/site';
 import { applyModelStyle, arrangeParts, disposeObject, parseModel, placeOnFloor, renderModelPreview } from '@/lib/model-preview';
 
 type ViewerState = 'idle' | 'loading' | 'ready' | 'error';
@@ -125,7 +126,7 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
   const text = COPY[language];
 
   useEffect(() => {
-    document.title = language === 'ar' ? 'استوديو المعاينة وحساب تكلفة الطباعة 3D | Mojassam 3D' : '3D preview & print-cost studio | Mojassam 3D';
+    document.title = language === 'ar' ? `استوديو المعاينة وحساب تكلفة الطباعة 3D | ${SITE_NAME_AR}` : `3D preview & print-cost studio | ${SITE_NAME}`;
   }, [language]);
 
   useEffect(() => {
@@ -566,7 +567,7 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
         </aside>
       </div>
 
-      <footer className="footer-note"><span>Mojassam 3D / v1</span><span>{text.footer}</span></footer>
+      <footer className="footer-note"><span>{language === 'ar' ? SITE_NAME_AR : SITE_NAME} / v1</span><span>{text.footer}</span></footer>
     </main>
   );
 }

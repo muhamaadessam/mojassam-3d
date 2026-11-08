@@ -1,38 +1,29 @@
-// Regenerates every favicon/app icon from the "print layers" mark.
-// Run: node scripts/generate-icons.mjs   (sharp ships with Next.js)
-// Keep the shapes in sync with components/logo-mark.tsx.
-import { mkdir, writeFile } from 'node:fs/promises';
+// Regenerates every favicon/app icon from the "اطبع بس" logo (public/brand/etba3bas-logo.svg).
+// Run: npm run icons   (sharp ships with Next.js)
+// The header uses the same file through components/logo-mark.tsx.
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
 
 const NAVY = '#0b1020';
 const LIME = '#bef264';
-const LIME_SHADE = '#6d8c45'; // lime at 55% over navy, same as the component's right face
-const BLUE = '#7dd3fc';
+
+const source = await readFile('public/brand/etba3bas-logo.svg', 'utf8');
+const [vx, vy, vw, vh] = source.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+const pathData = source.match(/ d="([^"]+)"/)[1];
 
 /**
+ * The logo centered on a 64px tile.
  * @param {object} options
  * @param {'rounded'|'square'|'none'} options.background
- * @param {number} [options.scale]   shrink the mark around its center (for maskable safe zones)
- * @param {boolean} [options.small]  simplified version that stays readable at 16px
+ * @param {number} [options.scale]  share of the tile the logo may fill (smaller for maskable safe zones)
  */
-function markSvg({ background, scale = 1, small = false }) {
-  const offsets = small ? [4, 11, 18] : [3, 8, 13, 18, 23];
-  const stroke = small ? 5 : 3.2;
-  const layers = (from, to, color) => offsets
-    .map((o) => `<path d="M${from[0]} ${from[1] + o} L${to[0]} ${to[1] + o}" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"/>`)
-    .join('');
-  const cubeTop = small ? 12 : 16; // the small version drops the nozzle and fills the space
-  const shift = cubeTop - 16;
-  const mark = `<g transform="translate(0 ${shift})">
-    <polygon points="32,16 50,26 32,36 14,26" fill="${LIME}"/>
-    ${layers([14, 26], [32, 36], LIME)}
-    ${layers([32, 36], [50, 26], LIME_SHADE)}
-  </g>${small ? '' : `<path d="M32 3 V8" stroke="${BLUE}" stroke-width="3" stroke-linecap="round"/><polygon points="27,8 37,8 32,13" fill="${BLUE}"/>`}`;
+function markSvg({ background, scale = 0.84 }) {
+  const fit = (64 * scale) / Math.max(vw, vh);
+  const x = (64 - vw * fit) / 2 - vx * fit;
+  const y = (64 - vh * fit) / 2 - vy * fit;
   const bg = background === 'rounded' ? `<rect width="64" height="64" rx="14" fill="${NAVY}"/>`
     : background === 'square' ? `<rect width="64" height="64" fill="${NAVY}"/>` : '';
-  const centerY = small ? 30 : 31;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">${bg}
-  <g transform="translate(32 32) scale(${scale}) translate(-32 -${centerY})">${mark}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">${bg}<path transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${fit.toFixed(5)})" fill="${LIME}" fill-rule="evenodd" d="${pathData}"/></svg>`;
 }
 
 const png = (svg, size) => sharp(Buffer.from(svg), { density: Math.max(72, (size / 64) * 72 * 2) }).resize(size, size).png({ compressionLevel: 9 }).toBuffer();
@@ -59,25 +50,24 @@ function ico(images) {
 
 const rounded = markSvg({ background: 'rounded' });
 await mkdir('public/icons', { recursive: true });
-await mkdir('public/brand', { recursive: true });
 
 const outputs = {
   // Browser tab: SVG for modern browsers, .ico for everything else.
   'app/icon.svg': rounded,
-  'public/brand/mojassam-icon.svg': rounded,
-  'public/brand/mojassam-mark.svg': markSvg({ background: 'none' }),
   // iOS home screen: full-bleed square, iOS rounds the corners itself.
-  'app/apple-icon.png': await png(markSvg({ background: 'square', scale: 0.8 }), 180),
+  'app/apple-icon.png': await png(markSvg({ background: 'square', scale: 0.72 }), 180),
   // Android / installed app (see app/manifest.ts).
   'public/icons/icon-192.png': await png(rounded, 192),
   'public/icons/icon-512.png': await png(rounded, 512),
-  // Maskable icons get cropped to circles/squircles: keep the mark inside the central 80%.
-  'public/icons/icon-maskable-512.png': await png(markSvg({ background: 'square', scale: 0.62 }), 512),
+  // Maskable icons get cropped to circles/squircles: keep the logo inside the central 80%.
+  'public/icons/icon-maskable-512.png': await png(markSvg({ background: 'square', scale: 0.6 }), 512),
   'app/favicon.ico': ico([
-    { size: 16, data: await png(markSvg({ background: 'rounded', small: true }), 16) },
-    { size: 32, data: await png(markSvg({ background: 'rounded', small: true }), 32) },
+    { size: 16, data: await png(markSvg({ background: 'rounded', scale: 0.92 }), 16) },
+    { size: 32, data: await png(markSvg({ background: 'rounded', scale: 0.92 }), 32) },
     { size: 48, data: await png(rounded, 48) },
   ]),
+  // Logo on navy for search engines and link previews (JSON-LD "logo").
+  'public/brand/etba3bas-logo.png': await png(markSvg({ background: 'square', scale: 0.8 }), 512),
 };
 
 for (const [path, content] of Object.entries(outputs)) {

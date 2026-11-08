@@ -11,7 +11,7 @@ import { COPY, type FileErrorKey } from '@/lib/copy';
 import { useLanguage } from '@/lib/language';
 import { formatBytes, formatNumber, validateModelFile } from '@/lib/model-file';
 import { savePendingFile } from '@/lib/pending-file';
-import { getFaq, SITE_TITLE_AR } from '@/lib/site';
+import { getFaq, SITE_NAME, SITE_NAME_AR, SITE_TITLE_AR } from '@/lib/site';
 
 type OrderState = 'idle' | 'added' | 'saving' | 'saved' | 'login' | 'failed' | 'paused';
 
@@ -32,7 +32,7 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
   const name = (design: ReadyDesign) => language === 'ar' ? design.nameAr : design.nameEn;
 
   useEffect(() => {
-    document.title = language === 'ar' ? SITE_TITLE_AR : 'Mojassam 3D — 3D file preview & 3D-printing cost estimate';
+    document.title = language === 'ar' ? SITE_TITLE_AR : `${SITE_NAME} — 3D file preview & 3D-printing cost estimate`;
   }, [language]);
 
   const chooseFile = async (file?: File) => {
@@ -230,7 +230,7 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
         </div>
       </section>
 
-      <footer className="footer-note"><span>Mojassam 3D / v1</span><span>{text.footer}</span></footer>
+      <footer className="footer-note"><span>{language === 'ar' ? SITE_NAME_AR : SITE_NAME} / v1</span><span>{text.footer}</span></footer>
     </main>
   );
 }

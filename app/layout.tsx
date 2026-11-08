@@ -1,22 +1,22 @@
 import type { Metadata, Viewport } from 'next';
-import { SITE_DESCRIPTION_AR, SITE_KEYWORDS, SITE_NAME, SITE_TITLE_AR, SITE_URL } from '@/lib/site';
+import { SITE_DESCRIPTION_AR, SITE_KEYWORDS, SITE_NAME, SITE_NAME_AR, SITE_TITLE_AR, SITE_URL } from '@/lib/site';
 import './globals.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: SITE_TITLE_AR, template: `%s | ${SITE_NAME}` },
+  title: { default: SITE_TITLE_AR, template: `%s | ${SITE_NAME_AR}` },
   description: SITE_DESCRIPTION_AR,
-  applicationName: SITE_NAME,
+  applicationName: SITE_NAME_AR,
   keywords: SITE_KEYWORDS,
-  authors: [{ name: SITE_NAME, url: SITE_URL }],
-  creator: SITE_NAME,
+  authors: [{ name: SITE_NAME_AR, url: SITE_URL }],
+  creator: SITE_NAME_AR,
   publisher: SITE_NAME,
   category: '3D printing',
   alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
     url: '/',
-    siteName: SITE_NAME,
+    siteName: SITE_NAME_AR,
     title: SITE_TITLE_AR,
     description: SITE_DESCRIPTION_AR,
     locale: 'ar_EG',
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 },
   },
-  appleWebApp: { title: SITE_NAME },
+  appleWebApp: { title: SITE_NAME_AR },
   formatDetection: { telephone: false },
 };
 
