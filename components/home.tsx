@@ -84,7 +84,6 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
         language={language}
         text={text}
         onToggleLanguage={toggleLanguage}
-        onUpload={() => fileInputRef.current?.click()}
       />
 
       <section className="home-hero">

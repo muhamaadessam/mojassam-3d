@@ -335,7 +335,6 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
         language={language}
         text={text}
         onToggleLanguage={toggleLanguage}
-        onUpload={() => fileInputRef.current?.click()}
       />
 
       <div className="workspace" id="studio">
