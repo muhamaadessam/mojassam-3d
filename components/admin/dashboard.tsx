@@ -378,13 +378,18 @@ function CatalogPanel({ draft, setDraft }: DraftProps) {
       <div className="admin-card">
         <div className="admin-card-head"><h2>التصميمات الجاهزة</h2><button className="ghost-button" onClick={() => set((pricing) => ({ ...pricing, designs: [...pricing.designs, { id: newId('design'), nameAr: 'تصميم جديد', nameEn: 'New design', descriptionAr: '', descriptionEn: '', categoryAr: '', categoryEn: '', material: pricing.materials[0]?.id ?? 'pla', infill: 20, weightGrams: 50, printHours: 2, artClass: 'organizer', images: [], enabled: false }] }))}>+ إضافة تصميم</button></div>
         <div className="admin-designs">
-          {draft.designs.map((design, index) => (
-            <details className={`admin-design ${design.enabled ? '' : 'disabled'}`} key={design.id}>
+          {draft.designs.map((design, index) => {
+            const material = draft.materials.find((item) => item.id === design.material);
+            // The store hides a design whose material is switched off, even if the design itself is enabled.
+            const materialOff = !material?.enabled;
+            const visible = design.enabled && !materialOff;
+            return (
+            <details className={`admin-design ${visible ? '' : 'disabled'}`} key={design.id}>
               <summary>
                 <strong>{design.nameAr}</strong>
                 <span>{draft.materials.find((material) => material.id === design.material)?.label} · {design.weightGrams} جم · {design.printHours} ساعة</span>
                 <b>{money(orderTotal(draft, getReadyPrice(design, draft)))}</b>
-                {!design.enabled && <em>مخفي</em>}
+                {!design.enabled ? <em>مخفي</em> : materialOff && <em>مخفي — الخامة متوقفة</em>}
               </summary>
               <div className="admin-grid">
                 <label className="admin-field"><span>الاسم بالعربي</span><input value={design.nameAr} onChange={(event) => updateDesign(index, { nameAr: event.target.value })} /></label>
@@ -400,11 +405,12 @@ function CatalogPanel({ draft, setDraft }: DraftProps) {
                 <DesignImages images={design.images} onChange={(images) => updateDesign(index, { images })} />
               </div>
               <div className="admin-design-actions">
-                <label className="admin-toggle"><input type="checkbox" checked={design.enabled} onChange={(event) => updateDesign(index, { enabled: event.target.checked })} /><span>{design.enabled ? 'ظاهر في المتجر' : 'مخفي من المتجر'}</span></label>
+                <label className="admin-toggle"><input type="checkbox" checked={design.enabled} onChange={(event) => updateDesign(index, { enabled: event.target.checked })} /><span>{!design.enabled ? 'مخفي من المتجر' : materialOff ? `مخفي لأن خامة ${material?.label ?? design.material} متوقفة — فعّلها من «الأسعار والوقت»` : 'ظاهر في المتجر'}</span></label>
                 <button className="ghost-button danger" onClick={() => set((pricing) => ({ ...pricing, designs: pricing.designs.filter((_, i) => i !== index) }))}>حذف التصميم</button>
               </div>
             </details>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
