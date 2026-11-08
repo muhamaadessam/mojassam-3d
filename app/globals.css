@@ -522,3 +522,23 @@ a.primary-button { display: inline-flex; align-items: center; justify-content: c
 .order-dialog-notice { margin: -6px 0 0; color: var(--color-brand); font-size: 13px; }
 .order-dialog-notice.error { color: var(--color-danger-text); }
 @media (max-width: 560px) { .order-dialog-head.has-thumb { grid-template-columns: 56px 1fr auto; } .order-dialog-thumb { width: 56px; height: 56px; } .order-dialog-foot { flex-direction: column; align-items: stretch; } .order-dialog-foot .primary-button { width: 100%; justify-content: center; } }
+
+/* Order thumbnails: a picture of the ordered model beside each order. */
+.order-thumb { --thumb: 84px; display: grid; flex: none; place-items: center; width: var(--thumb); height: var(--thumb); overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: radial-gradient(circle at 50% 35%, var(--color-surface-raised, rgba(255, 255, 255, 0.06)), transparent 70%), var(--color-canvas); }
+.order-thumb a { display: block; width: 100%; height: 100%; }
+.order-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+.order-thumb-empty { color: var(--color-text-subtle); font-size: 12px; font-weight: 800; letter-spacing: 0.08em; }
+.order-thumb-empty.loading { animation: order-thumb-pulse 1.2s ease-in-out infinite; }
+@keyframes order-thumb-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .order-thumb-empty.loading { animation: none; } }
+.order-card-info { flex: 1; min-width: 0; }
+.admin-order-head { grid-template-columns: 52px 110px minmax(0, 1fr) auto auto; }
+.admin-order-head .order-thumb { --thumb: 52px; border-radius: 10px; }
+@media (max-width: 760px) {
+  .order-card { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: start; }
+  .order-card .order-thumb { --thumb: 72px; }
+  .order-card .order-metrics { grid-column: 1 / -1; }
+  .admin-order-head { grid-template-columns: 48px minmax(0, 1fr) auto; }
+  .admin-order-head .order-thumb { --thumb: 48px; grid-row: span 2; }
+  .admin-order-head .order-status { grid-column: 2 / -1; }
+}

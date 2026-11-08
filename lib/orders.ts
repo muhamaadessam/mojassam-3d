@@ -52,7 +52,7 @@ const optionalText = (value: unknown, max: number) => (typeof value === 'string'
  * Builds an order from what the customer chose. Prices and hours are always computed here
  * from the current pricing settings, never taken from the request.
  */
-export async function createOrder(userId: string, body: Record<string, unknown>, files: PreparedOrderFiles = { model: null, images: [] }) {
+export async function createOrder(userId: string, body: Record<string, unknown>, files: PreparedOrderFiles = { model: null, images: [], preview: null }) {
   const pricing = getPricing();
   if (!pricing.acceptingOrders) throw new OrderError(pricing.notice || 'الطلبات متوقفة مؤقتًا.');
   const color = findColor(pricing, body.colorId);

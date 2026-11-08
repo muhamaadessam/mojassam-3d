@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import LogoMark from '@/components/logo-mark';
+import OrderThumb from '@/components/order-thumb';
 import { toWebp } from '@/lib/image-webp';
 import { formatBytes, formatDate, formatNumber } from '@/lib/model-file';
 import { estimateCustomPrint, getReadyPrice, MAX_DESIGN_IMAGES, orderTotal, type Material, type Pricing, type PrintColor, type ReadyDesign } from '@/lib/catalog';
@@ -186,6 +187,7 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const color = pricing.colors.find((item) => item.id === order.color);
+  const design = order.design_id ? pricing.designs.find((item) => item.id === order.design_id) : undefined;
   const customer = `${order.first_name} ${order.last_name}`.trim() || order.email;
   const phoneDigits = order.phone.replace(/[^\d]/g, '');
   const whatsapp = phoneDigits ? `https://wa.me/${phoneDigits.startsWith('0') ? `2${phoneDigits}` : phoneDigits}` : '';
@@ -222,6 +224,7 @@ function OrderRow({ order, pricing, open, onToggle, onSaved, onDeleted }: { orde
   return (
     <article className={`admin-order ${open ? 'open' : ''}`}>
       <button className="admin-order-head" onClick={onToggle} aria-expanded={open}>
+        <OrderThumb orderId={order.id} files={order.files} color={color?.hex} image={design?.images[0]} label={order.design_name} />
         <span className={`order-status status-${order.status}`}>{STATUS_AR[order.status] ?? order.status}</span>
         <span className="admin-order-title"><strong>{order.design_name}{order.quantity > 1 ? ` × ${order.quantity}` : ''}</strong><small><bdi>{customer}</bdi> · <bdi>{date(order.created_at)}</bdi></small></span>
         <span className="admin-order-spec">{color && <i className="admin-swatch" style={{ background: color.hex }} />}{order.material} · {order.infill}%</span>
