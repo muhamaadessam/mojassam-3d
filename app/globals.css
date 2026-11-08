@@ -547,3 +547,52 @@ a.primary-button { display: inline-flex; align-items: center; justify-content: c
 .order-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .order-actions .ghost-button { padding: 6px 12px; font-size: 12px; }
 .order-actions-error { flex-basis: 100%; margin: 0; color: var(--color-danger-text) !important; font-size: 12px; }
+
+/* Studio: part files of a design, and the designs already added to the order. */
+.parts-list { display: grid; gap: 6px; margin-top: 12px; }
+.parts-list-title, .cart-title { color: var(--color-text-subtle); font-size: 12px; }
+.part-row, .cart-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; border: 1px solid var(--color-border); border-radius: 10px; padding: 8px 10px; background: var(--color-surface-raised); }
+.part-name { overflow: hidden; color: var(--color-text-primary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.part-row small { color: var(--color-text-subtle); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.part-remove { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--color-border); border-radius: 999px; padding: 0; background: transparent; color: var(--color-text-muted); font-size: 16px; line-height: 1; cursor: pointer; }
+.part-remove:hover { border-color: var(--color-danger); color: var(--color-danger); }
+.part-add, .add-design-button { justify-self: start; }
+.parts-hint { margin: 0; color: var(--color-text-subtle); font-size: 12px; line-height: 1.6; }
+.parts-error { margin: 0; color: var(--color-danger-text); font-size: 12px; }
+.order-builder { display: grid; gap: 12px; }
+.cart-list { display: grid; gap: 6px; }
+.cart-item { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.cart-item div { display: grid; gap: 2px; min-width: 0; }
+.cart-item strong { overflow: hidden; color: var(--color-text-heading); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.cart-item small { color: var(--color-text-subtle); font-size: 11px; }
+.cart-item b { color: var(--color-brand); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cart-swatch { width: 14px; height: 14px; border: 1px solid var(--color-border-strong); border-radius: 999px; }
+.cart-total { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 6px 2px 0; }
+.cart-total span { color: var(--color-text-secondary); font-size: 13px; }
+.cart-total strong { color: var(--color-brand); font-size: 22px; font-variant-numeric: tabular-nums; }
+
+/* Orders with several designs. */
+.order-thumb.small { --thumb: 52px; border-radius: 10px; }
+.order-items { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.order-items li { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: start; gap: 10px; }
+.order-items strong { color: var(--color-text-heading); font-size: 14px; }
+.order-items p { margin: 2px 0 0; }
+.order-items .order-file-photos { margin-top: 6px; }
+.edit-item { display: grid; gap: 12px; }
+.edit-item.boxed { border: 1px solid var(--color-border); border-radius: 12px; padding: 12px; }
+.edit-item-name { color: var(--color-text-heading); font-size: 14px; }
+.edit-item-qty { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.admin-items { display: grid; gap: 10px; }
+.admin-item { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.admin-item.boxed { grid-template-columns: 52px minmax(0, 1fr); align-items: start; border: 1px solid var(--color-border); border-radius: 12px; padding: 10px; }
+.admin-item-specs { color: var(--color-text-secondary); font-size: 13px; }
+.admin-item-specs strong { color: var(--color-text-heading); }
+.admin-preview-link { justify-self: start; color: var(--color-info); font-size: 12px; }
+.order-extras.no-qty { grid-template-columns: 1fr; }
+.edit-item .qty-stepper input { width: 46px; border: 0; padding: 8px 0; color: var(--color-text-heading); background: transparent; font: inherit; font-size: 13px; text-align: center; outline: none; -moz-appearance: textfield; }
+
+/* The viewer keeps a steady size and stays in view while the panel beside it grows (parts, designs in the order). */
+@media (min-width: 761px) {
+  .viewer-card { position: sticky; top: 16px; align-self: start; height: max(600px, calc(100vh - 120px)); min-height: 0; }
+}
+.edit-item-qty > span:first-child { color: var(--color-text-secondary); font-size: 12px; font-weight: 400; }

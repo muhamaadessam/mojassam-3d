@@ -4,14 +4,17 @@ import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { getDb } from './auth';
-import { MAX_DESIGN_IMAGES, MAX_FILE_SIZE, MAX_IMAGE_BYTES, MAX_ORDER_IMAGES } from './catalog';
+import { MAX_DESIGN_IMAGES, MAX_FILE_SIZE, MAX_IMAGE_BYTES, MAX_ITEM_PARTS, MAX_ORDER_IMAGES, MAX_ORDER_ITEMS, MAX_ORDER_UPLOAD } from './catalog';
 
 export { MAX_DESIGN_IMAGES, MAX_IMAGE_BYTES };
-/** Largest multipart body accepted for an order: the model, its photos, and the form fields. */
-export const MAX_ORDER_BODY = MAX_FILE_SIZE + MAX_ORDER_IMAGES * MAX_IMAGE_BYTES + 1024 * 1024;
+/** Largest multipart body accepted for an order: every part file, the previews, the photos, and the form fields. */
+export const MAX_ORDER_BODY = MAX_ORDER_UPLOAD + 1024 * 1024;
 
-/** `preview` is a picture of the model drawn in the customer's browser; `image` is a reference photo. */
-export type OrderFile = { id: string; kind: 'model' | 'image' | 'preview'; name: string; size: number };
+/**
+ * `model` is one part file of a design and `preview` a picture of that design drawn in the customer's browser;
+ * both belong to an order item. `image` is a reference photo for the whole order.
+ */
+export type OrderFile = { id: string; kind: 'model' | 'image' | 'preview'; name: string; size: number; item_id: string | null };
 
 export class UploadError extends Error {}
 
@@ -36,39 +39,55 @@ async function readImage(file: File) {
 
 const cleanName = (name: string) => name.replace(/[\\/\0-\x1f]/g, '_').trim().slice(0, 160) || 'file';
 
-/** Checks the customer's attachments before an order is created, so a bad file never leaves a half-saved order. */
-export async function prepareOrderFiles(model: File | null, images: File[], preview: File | null = null) {
-  if (images.length > MAX_ORDER_IMAGES) throw new UploadError(`الحد الأقصى ${MAX_ORDER_IMAGES} صور.`);
-  let modelFile: { name: string; ext: string; bytes: Uint8Array } | null = null;
-  if (model) {
-    const ext = model.name.split('.').pop()?.toLowerCase() ?? '';
-    if (!MODEL_EXTENSIONS.includes(ext as (typeof MODEL_EXTENSIONS)[number])) throw new UploadError('نوع الملف غير مدعوم.');
-    if (model.size === 0 || model.size > MAX_FILE_SIZE) throw new UploadError('حجم الملف أكبر من 50MB.');
-    modelFile = { name: cleanName(model.name), ext, bytes: new Uint8Array(await model.arrayBuffer()) };
-  }
-  const imageFiles = await Promise.all(images.map(async (image) => ({ name: cleanName(image.name), bytes: await readImage(image) })));
-  const previewBytes = preview && modelFile ? await readImage(preview) : null;
-  return { model: modelFile, images: imageFiles, preview: previewBytes };
-}
-export type PreparedOrderFiles = Awaited<ReturnType<typeof prepareOrderFiles>>;
+type ModelUpload = { name: string; ext: string; bytes: Uint8Array };
+export type PreparedOrderFiles = { items: { models: ModelUpload[]; preview: Uint8Array | null }[]; images: { name: string; bytes: Uint8Array }[] };
+export const NO_FILES: PreparedOrderFiles = { items: [], images: [] };
 
-export async function saveOrderFiles(orderId: string, files: PreparedOrderFiles) {
+async function readModel(model: File): Promise<ModelUpload> {
+  const ext = model.name.split('.').pop()?.toLowerCase() ?? '';
+  if (!MODEL_EXTENSIONS.includes(ext as (typeof MODEL_EXTENSIONS)[number])) throw new UploadError('نوع الملف غير مدعوم.');
+  if (model.size === 0 || model.size > MAX_FILE_SIZE) throw new UploadError('حجم الملف أكبر من 50MB.');
+  return { name: cleanName(model.name), ext, bytes: new Uint8Array(await model.arrayBuffer()) };
+}
+
+/**
+ * Checks the customer's attachments before an order is created, so a bad file never leaves a half-saved order.
+ * Each item is one design: its part files and an optional preview picture.
+ */
+export async function prepareOrderFiles(items: { models: File[]; preview: File | null }[], images: File[]): Promise<PreparedOrderFiles> {
+  if (items.length > MAX_ORDER_ITEMS) throw new UploadError(`الحد الأقصى ${MAX_ORDER_ITEMS} تصميمات في الطلب.`);
+  if (images.length > MAX_ORDER_IMAGES) throw new UploadError(`الحد الأقصى ${MAX_ORDER_IMAGES} صور.`);
+  if (items.some((item) => item.models.length > MAX_ITEM_PARTS)) throw new UploadError(`الحد الأقصى ${MAX_ITEM_PARTS} جزء للتصميم.`);
+  const total = [...items.flatMap((item) => [...item.models, ...(item.preview ? [item.preview] : [])]), ...images].reduce((sum, file) => sum + file.size, 0);
+  if (total > MAX_ORDER_UPLOAD) throw new UploadError('حجم الملفات أكبر من المسموح.');
+  return {
+    items: await Promise.all(items.map(async (item) => ({
+      models: await Promise.all(item.models.map(readModel)),
+      preview: item.preview && item.models.length ? await readImage(item.preview) : null,
+    }))),
+    images: await Promise.all(images.map(async (image) => ({ name: cleanName(image.name), bytes: await readImage(image) }))),
+  };
+}
+
+/** Writes the files; `itemIds[i]` is the order item that `files.items[i]` belongs to. */
+export async function saveOrderFiles(orderId: string, itemIds: string[], files: PreparedOrderFiles) {
   const entries = [
-    ...(files.model ? [{ kind: 'model', name: files.model.name, ext: files.model.ext, bytes: files.model.bytes }] : []),
-    ...files.images.map((image) => ({ kind: 'image', name: image.name, ext: 'webp', bytes: image.bytes })),
-    ...(files.preview ? [{ kind: 'preview', name: 'preview.webp', ext: 'webp', bytes: files.preview }] : []),
+    ...files.items.flatMap((item, index) => [
+      ...item.models.map((model) => ({ itemId: itemIds[index], kind: 'model', name: model.name, ext: model.ext, bytes: model.bytes })),
+      ...(item.preview ? [{ itemId: itemIds[index], kind: 'preview', name: 'preview.webp', ext: 'webp', bytes: item.preview }] : []),
+    ]),
+    ...files.images.map((image) => ({ itemId: null, kind: 'image', name: image.name, ext: 'webp', bytes: image.bytes })),
   ];
   if (!entries.length) return;
   const dir = orderDir(orderId);
   await mkdir(dir, { recursive: true, mode: 0o700 });
-  const db = getDb();
-  const insert = db.prepare('INSERT INTO order_files(id,order_id,kind,name,stored,size,created_at) VALUES(?,?,?,?,?,?,?)');
+  const insert = getDb().prepare('INSERT INTO order_files(id,order_id,item_id,kind,name,stored,size,created_at) VALUES(?,?,?,?,?,?,?,?)');
   const now = new Date().toISOString();
   for (const entry of entries) {
     const id = randomUUID();
     const stored = `${id}.${entry.ext}`;
     await writeFile(resolve(dir, stored), entry.bytes, { mode: 0o600 });
-    insert.run(id, orderId, entry.kind, entry.name, stored, entry.bytes.byteLength, now);
+    insert.run(id, orderId, entry.itemId, entry.kind, entry.name, stored, entry.bytes.byteLength, now);
   }
 }
 
@@ -80,7 +99,7 @@ export async function deleteOrderFiles(orderId: string) {
 export function filesByOrder(orderIds: string[]) {
   const grouped = new Map<string, OrderFile[]>();
   if (!orderIds.length) return grouped;
-  const rows = getDb().prepare(`SELECT id, order_id, kind, name, size FROM order_files WHERE order_id IN (${orderIds.map(() => '?').join(',')}) ORDER BY kind DESC, created_at`).all(...orderIds) as unknown as (OrderFile & { order_id: string })[];
+  const rows = getDb().prepare(`SELECT id, order_id, item_id, kind, name, size FROM order_files WHERE order_id IN (${orderIds.map(() => '?').join(',')}) ORDER BY kind DESC, created_at, rowid`).all(...orderIds) as unknown as (OrderFile & { order_id: string })[];
   for (const { order_id: orderId, ...file } of rows) grouped.set(orderId, [...(grouped.get(orderId) ?? []), { ...file }]);
   return grouped;
 }

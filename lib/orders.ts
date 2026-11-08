@@ -1,13 +1,33 @@
 import { randomUUID } from 'node:crypto';
+import type { DatabaseSync } from 'node:sqlite';
 import { getDb } from './auth';
-import { anyDesign, estimateCustomPrint, findColor, findDesign, findMaterial, getReadyPrice, MAX_QUANTITY, orderTotal } from './catalog';
+import { anyDesign, estimateCustomPrint, findColor, findDesign, findMaterial, getReadyPrice, MAX_ITEM_PARTS, MAX_ORDER_ITEMS, MAX_QUANTITY, orderTotal, type Pricing } from './catalog';
 import { getPricing } from './settings';
-import type { Pricing } from './catalog';
-import { deleteOrderFiles, filesByOrder, saveOrderFiles, type OrderFile, type PreparedOrderFiles } from './uploads';
+import { deleteOrderFiles, filesByOrder, NO_FILES, saveOrderFiles, type OrderFile, type PreparedOrderFiles } from './uploads';
 
 export const ORDER_STATUSES = ['pending', 'confirmed', 'printing', 'ready', 'completed', 'cancelled'] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
+/** One design in an order, with its own settings. `files` are its part files and its preview picture. */
+export type OrderItem = {
+  id: string;
+  design_id: string | null;
+  name: string;
+  material: string | null;
+  color: string | null;
+  infill: number | null;
+  quantity: number;
+  /** Price and print hours of one piece when the order was placed; null on orders from before they were stored. */
+  unit_price: number | null;
+  unit_hours: number | null;
+  files: OrderFile[];
+};
+
+/**
+ * An order. The design fields on the order itself summarise its items (the first item's color and infill,
+ * every material, the total number of pieces) for lists, search and the CSV export.
+ * `files` holds only the reference photos for the whole order.
+ */
 export type OrderRow = {
   id: string;
   design_id: string | null;
@@ -23,30 +43,37 @@ export type OrderRow = {
   customer_note: string;
   final_price: number | null;
   admin_note: string;
-  /** Price and print hours of one piece when the order was placed; null on older orders. */
-  unit_price: number | null;
-  unit_hours: number | null;
   created_at: string;
   updated_at: string | null;
+  items: OrderItem[];
   files: OrderFile[];
 };
 export type AdminOrderRow = OrderRow & { user_id: string; email: string; first_name: string; last_name: string };
 
-const ORDER_FIELDS = 'id, design_id, design_name, status, material, color, infill, estimated_hours, estimated_price, quantity, phone, customer_note, final_price, admin_note, unit_price, unit_hours, created_at, updated_at';
+const ORDER_FIELDS = 'id, design_id, design_name, status, material, color, infill, estimated_hours, estimated_price, quantity, phone, customer_note, final_price, admin_note, created_at, updated_at';
+const ITEM_FIELDS = 'id, order_id, design_id, name, material, color, infill, quantity, unit_price, unit_hours';
 const round = (value: number) => Math.round(value * 100) / 100;
 
 export class OrderError extends Error {}
 /** The order does not exist or belongs to someone else; both look the same to the caller. */
 export class NotFound extends Error {}
 
-/** Adds each order's attachments. node:sqlite rows have a null prototype, so they are copied into plain objects. */
-function withFiles<T extends { id: string }>(rows: T[]) {
-  const files = filesByOrder(rows.map((row) => row.id));
-  return rows.map((row) => ({ ...row, files: files.get(row.id) ?? [] }));
+/** Adds each order's items and files. node:sqlite rows have a null prototype, so they are copied into plain objects. */
+function withDetails<T extends { id: string }>(rows: T[]) {
+  if (!rows.length) return [];
+  const ids = rows.map((row) => row.id);
+  const files = filesByOrder(ids);
+  const items = new Map<string, OrderItem[]>();
+  const itemRows = getDb().prepare(`SELECT ${ITEM_FIELDS} FROM order_items WHERE order_id IN (${ids.map(() => '?').join(',')}) ORDER BY position`).all(...ids) as unknown as (Omit<OrderItem, 'files'> & { order_id: string })[];
+  for (const { order_id: orderId, ...item } of itemRows) {
+    const own = (files.get(orderId) ?? []).filter((file) => file.item_id === item.id);
+    items.set(orderId, [...(items.get(orderId) ?? []), { ...item, files: own }]);
+  }
+  return rows.map((row) => ({ ...row, items: items.get(row.id) ?? [], files: (files.get(row.id) ?? []).filter((file) => !file.item_id) }));
 }
 
 export function listOrders(userId: string) {
-  return withFiles(getDb().prepare(`SELECT ${ORDER_FIELDS} FROM orders WHERE user_id=? ORDER BY created_at DESC LIMIT 200`).all(userId) as unknown as Omit<OrderRow, 'files'>[]) as OrderRow[];
+  return withDetails(getDb().prepare(`SELECT ${ORDER_FIELDS} FROM orders WHERE user_id=? ORDER BY created_at DESC LIMIT 200`).all(userId) as unknown as Omit<OrderRow, 'items' | 'files'>[]) as OrderRow[];
 }
 
 const finiteInRange = (value: unknown, min: number, max: number): value is number =>
@@ -54,56 +81,134 @@ const finiteInRange = (value: unknown, min: number, max: number): value is numbe
 
 const optionalText = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
+function readQuantity(value: unknown, fallback = 1) {
+  const quantity = value === undefined ? fallback : value;
+  if (!Number.isInteger(quantity) || !finiteInRange(quantity, 1, MAX_QUANTITY)) throw new Error('Invalid quantity');
+  return quantity;
+}
+
+function readPhone(value: unknown) {
+  const phone = optionalText(value, 30);
+  if (phone && !/^\+?[\d\s-]{6,20}$/.test(phone)) throw new Error('Invalid phone');
+  return phone;
+}
+
+type ItemSpec = { designId: string; name: string; material: string; color: string; infill: number; quantity: number; unitPrice: number; unitHours: number };
+
+/** The order's own design fields and totals, worked out from its items. */
+function summarise(items: Pick<ItemSpec, 'designId' | 'name' | 'material' | 'color' | 'infill' | 'quantity' | 'unitPrice' | 'unitHours'>[], pricing: Pricing) {
+  const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  return {
+    designId: items.length === 1 ? items[0].designId : '',
+    name: items.map((item) => item.name).join(' + ').slice(0, 300),
+    material: [...new Set(items.map((item) => item.material))].join(' + '),
+    color: items[0].color,
+    infill: items[0].infill,
+    quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+    hours: round(items.reduce((sum, item) => sum + item.unitHours * item.quantity, 0)),
+    // The setup fee and the minimum apply once per order, not once per design.
+    price: round(orderTotal(pricing, subtotal, 1)),
+  };
+}
+
+function transaction<T>(db: DatabaseSync, run: () => T) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = run();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+/** One part file as the browser measured it while previewing it. */
+function readPart(part: unknown) {
+  const { volumeMm3, dimensionsMm } = (part ?? {}) as { volumeMm3?: unknown; dimensionsMm?: Record<string, unknown> };
+  // Measurements are bounded to a realistic printer size; the shop reviews the files before confirming the price.
+  if (!finiteInRange(volumeMm3, 0.001, 1e9) || !dimensionsMm || typeof dimensionsMm !== 'object') throw new Error('Invalid model');
+  const dims = { x: dimensionsMm.x, y: dimensionsMm.y, z: dimensionsMm.z };
+  if (![dims.x, dims.y, dims.z].every((value) => finiteInRange(value, 0.001, 2000))) throw new Error('Invalid model');
+  return { volumeMm3, dims: dims as { x: number; y: number; z: number } };
+}
+
+/**
+ * Custom orders list their designs in `items`, each with its settings and the measurements of its parts.
+ * Orders sent in the older single-design shape are read as one item with one part.
+ */
+function customItems(body: Record<string, unknown>) {
+  if (Array.isArray(body.items)) return body.items as Record<string, unknown>[];
+  return [{ ...body, parts: [{ volumeMm3: body.volumeMm3, dimensionsMm: body.dimensionsMm }] }];
+}
+
 /**
  * Builds an order from what the customer chose. Prices and hours are always computed here
  * from the current pricing settings, never taken from the request.
  */
-export async function createOrder(userId: string, body: Record<string, unknown>, files: PreparedOrderFiles = { model: null, images: [], preview: null }) {
+export async function createOrder(userId: string, body: Record<string, unknown>, files: PreparedOrderFiles = NO_FILES) {
   const pricing = getPricing();
   if (!pricing.acceptingOrders) throw new OrderError(pricing.notice || 'الطلبات متوقفة مؤقتًا.');
-  const color = findColor(pricing, body.colorId);
-  if (!color) throw new Error('Invalid color');
-  const quantity = body.quantity === undefined ? 1 : body.quantity;
-  if (!Number.isInteger(quantity) || !finiteInRange(quantity, 1, MAX_QUANTITY)) throw new Error('Invalid quantity');
-  const phone = optionalText(body.phone, 30);
-  if (phone && !/^\+?[\d\s-]{6,20}$/.test(phone)) throw new Error('Invalid phone');
-  let values: { designId: string; designName: string; material: string; infill: number; hours: number; unitPrice: number };
+  const phone = readPhone(body.phone);
+  let specs: ItemSpec[];
 
   if (body.kind === 'ready') {
     const design = findDesign(pricing, body.designId);
     if (!design) throw new Error('Unknown design');
+    const color = findColor(pricing, body.colorId);
+    if (!color) throw new Error('Invalid color');
     const material = pricing.materials.find((item) => item.id === design.material)!;
-    values = { designId: design.id, designName: design.nameAr, material: material.label, infill: design.infill, hours: design.printHours, unitPrice: getReadyPrice(design, pricing) };
+    specs = [{ designId: design.id, name: design.nameAr, material: material.label, color: color.id, infill: design.infill, quantity: readQuantity(body.quantity), unitPrice: getReadyPrice(design, pricing), unitHours: design.printHours }];
+    files = { items: [], images: files.images };
   } else if (body.kind === 'custom') {
-    const { infill, volumeMm3, dimensionsMm } = body as Record<string, unknown> & { dimensionsMm?: Record<string, unknown> };
-    const material = findMaterial(pricing, body.material);
-    if (!material || !finiteInRange(infill, 10, 100)) throw new Error('Invalid settings');
-    if (!files.model) throw new OrderError('ارفع ملف التصميم مع الطلب.');
-    // The browser measures the model while previewing it. The measurements are bounded to a
-    // realistic printer size, and the shop reviews the attached file before confirming the price.
-    if (!finiteInRange(volumeMm3, 0.001, 1e9) || !dimensionsMm || typeof dimensionsMm !== 'object') throw new Error('Invalid model');
-    const dims = { x: dimensionsMm.x, y: dimensionsMm.y, z: dimensionsMm.z };
-    if (![dims.x, dims.y, dims.z].every((value) => finiteInRange(value, 0.001, 2000))) throw new Error('Invalid model');
-    const estimate = estimateCustomPrint(volumeMm3, dims as { x: number; y: number; z: number }, infill, material, pricing);
-    values = { designId: '', designName: files.model.name, material: material.label, infill, hours: estimate.hours, unitPrice: estimate.price };
+    const raw = customItems(body);
+    if (!raw.length || raw.length > MAX_ORDER_ITEMS) throw new Error('Invalid order');
+    specs = raw.map((item, index) => {
+      const models = files.items[index]?.models ?? [];
+      if (!models.length) throw new OrderError('ارفع ملف التصميم مع الطلب.');
+      const material = findMaterial(pricing, item.material);
+      const color = findColor(pricing, item.colorId);
+      if (!material || !color || !finiteInRange(item.infill, 10, 100)) throw new Error('Invalid settings');
+      const parts = Array.isArray(item.parts) ? item.parts : [];
+      if (parts.length !== models.length || parts.length > MAX_ITEM_PARTS) throw new Error('Invalid model');
+      // Each part prints on its own, so one piece of the design costs the sum of its parts.
+      const estimates = parts.map(readPart).map((part) => estimateCustomPrint(part.volumeMm3, part.dims, item.infill as number, material, pricing));
+      return {
+        designId: '',
+        name: models[0].name,
+        material: material.label,
+        color: color.id,
+        infill: item.infill as number,
+        quantity: readQuantity(item.quantity),
+        unitPrice: estimates.reduce((sum, estimate) => sum + estimate.price, 0),
+        unitHours: estimates.reduce((sum, estimate) => sum + estimate.hours, 0),
+      };
+    });
+    if (files.items.length !== specs.length) throw new Error('Invalid order');
   } else {
     throw new Error('Invalid order');
   }
 
   const id = randomUUID();
+  const itemIds = specs.map(() => randomUUID());
   const db = getDb();
   const now = new Date().toISOString();
-  db.prepare('INSERT INTO orders(id,user_id,design_id,design_name,material,color,infill,estimated_hours,estimated_price,quantity,phone,customer_note,unit_price,unit_hours,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, userId, values.designId, values.designName, values.material, color.id, values.infill, round(values.hours * quantity), round(orderTotal(pricing, values.unitPrice, quantity)), quantity, phone, optionalText(body.note, 500), values.unitPrice, values.hours, now, now);
+  const total = summarise(specs, pricing);
+  transaction(db, () => {
+    db.prepare('INSERT INTO orders(id,user_id,design_id,design_name,material,color,infill,estimated_hours,estimated_price,quantity,phone,customer_note,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, userId, total.designId, total.name, total.material, total.color, total.infill, total.hours, total.price, total.quantity, phone, optionalText(body.note, 500), now, now);
+    const insert = db.prepare(`INSERT INTO order_items(id,order_id,position,design_id,name,material,color,infill,quantity,unit_price,unit_hours) VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
+    specs.forEach((spec, index) => insert.run(itemIds[index], id, index, spec.designId, spec.name, spec.material, spec.color, spec.infill, spec.quantity, spec.unitPrice, spec.unitHours));
+  });
   try {
-    await saveOrderFiles(id, files);
+    await saveOrderFiles(id, itemIds, files);
   } catch (error) {
-    // Never keep an order whose file could not be stored: the shop would have nothing to print.
+    // Never keep an order whose files could not be stored: the shop would have nothing to print.
     db.prepare('DELETE FROM orders WHERE id=?').run(id);
     await deleteOrderFiles(id);
     throw error;
   }
-  return withFiles([db.prepare(`SELECT ${ORDER_FIELDS} FROM orders WHERE id=? AND user_id=?`).get(id, userId) as unknown as Omit<OrderRow, 'files'>])[0] as OrderRow;
+  return withDetails([db.prepare(`SELECT ${ORDER_FIELDS} FROM orders WHERE id=? AND user_id=?`).get(id, userId) as unknown as Omit<OrderRow, 'items' | 'files'>])[0] as OrderRow;
 }
 
 // ---------- Customer changes ----------
@@ -112,54 +217,71 @@ export async function createOrder(userId: string, body: Record<string, unknown>,
 export const EDITABLE_STATUS = 'pending';
 const LOCKED = 'الطلب ده الورشة بدأت فيه، ومينفعش يتعدّل أو يتحذف دلوقتي.';
 
-/** Price and hours of one piece. Older orders did not store them, so they are worked back from the totals. */
-export function unitCost(order: Pick<OrderRow, 'design_id' | 'quantity' | 'estimated_price' | 'estimated_hours' | 'unit_price' | 'unit_hours'>, pricing: Pricing) {
-  const pieces = Math.max(1, order.quantity);
-  const design = order.design_id ? anyDesign(pricing, order.design_id) : undefined;
+/**
+ * Price and hours of one piece of an item. Orders from before these were stored have a single item,
+ * so they are worked back from the order's totals.
+ */
+export function itemUnitCost(item: Pick<OrderItem, 'design_id' | 'quantity' | 'unit_price' | 'unit_hours'>, order: Pick<OrderRow, 'estimated_price' | 'estimated_hours'>, pricing: Pricing) {
+  const pieces = Math.max(1, item.quantity);
+  const design = item.design_id ? anyDesign(pricing, item.design_id) : undefined;
   return {
-    unitPrice: order.unit_price ?? (design ? getReadyPrice(design, pricing) : Math.max(0, (order.estimated_price ?? 0) - pricing.setupFee) / pieces),
-    unitHours: order.unit_hours ?? (order.estimated_hours ?? 0) / pieces,
+    unitPrice: item.unit_price ?? (design ? getReadyPrice(design, pricing) : Math.max(0, (order.estimated_price ?? 0) - pricing.setupFee) / pieces),
+    unitHours: item.unit_hours ?? (order.estimated_hours ?? 0) / pieces,
   };
 }
 
-type StoredOrder = { status: string; design_id: string | null; quantity: number; estimated_price: number | null; estimated_hours: number | null; unit_price: number | null; unit_hours: number | null; color: string | null; phone: string; customer_note: string };
-
 /**
- * Changes the color, quantity, phone, or note of a customer's own order while it is still pending.
- * The price of one piece stays what it was when the order was placed; only the quantity changes the total.
+ * Changes the color and quantity of each design, and the phone or note, of a customer's own order while it is
+ * still pending. `items` is a list of `{ id, colorId?, quantity? }`; for an order with one design, `colorId` and
+ * `quantity` may also be sent on their own. The price of one piece stays what it was when the order was placed.
  */
 export function editOrder(userId: string, id: unknown, body: Record<string, unknown>) {
   const db = getDb();
-  if (typeof id !== 'string') throw new OrderError('الطلب غير موجود.');
-  const current = db.prepare('SELECT status, design_id, quantity, estimated_price, estimated_hours, unit_price, unit_hours, color, phone, customer_note FROM orders WHERE id=? AND user_id=?').get(id, userId) as StoredOrder | undefined;
-  if (!current) throw new NotFound();
-  if (current.status !== EDITABLE_STATUS) throw new OrderError(LOCKED);
+  if (typeof id !== 'string') throw new NotFound();
+  const order = listOrders(userId).find((row) => row.id === id);
+  if (!order) throw new NotFound();
+  if (order.status !== EDITABLE_STATUS) throw new OrderError(LOCKED);
   const pricing = getPricing();
 
-  let color = current.color;
-  if (body.colorId !== undefined && body.colorId !== current.color) {
-    const chosen = findColor(pricing, body.colorId);
-    if (!chosen) throw new Error('Invalid color');
-    color = chosen.id;
+  const changes = new Map<string, Record<string, unknown>>();
+  if (Array.isArray(body.items)) {
+    for (const change of body.items as Record<string, unknown>[]) {
+      if (!change || typeof change.id !== 'string' || !order.items.some((item) => item.id === change.id)) throw new Error('Unknown item');
+      changes.set(change.id, change);
+    }
+  } else if (order.items.length === 1 && (body.colorId !== undefined || body.quantity !== undefined)) {
+    changes.set(order.items[0].id, { colorId: body.colorId, quantity: body.quantity });
   }
-  const quantity = body.quantity === undefined ? current.quantity : body.quantity;
-  if (!Number.isInteger(quantity) || !finiteInRange(quantity, 1, MAX_QUANTITY)) throw new Error('Invalid quantity');
-  const phone = body.phone === undefined ? current.phone : optionalText(body.phone, 30);
-  if (phone && !/^\+?[\d\s-]{6,20}$/.test(phone)) throw new Error('Invalid phone');
-  const note = body.note === undefined ? current.customer_note : optionalText(body.note, 500);
 
-  const { unitPrice, unitHours } = unitCost(current, pricing);
+  const items = order.items.map((item) => {
+    const change = changes.get(item.id) ?? {};
+    let color = item.color ?? '';
+    if (change.colorId !== undefined && change.colorId !== item.color) {
+      const chosen = findColor(pricing, change.colorId);
+      if (!chosen) throw new Error('Invalid color');
+      color = chosen.id;
+    }
+    const { unitPrice, unitHours } = itemUnitCost(item, order, pricing);
+    return { id: item.id, designId: item.design_id ?? '', name: item.name, material: item.material ?? '', color, infill: item.infill ?? 0, quantity: readQuantity(change.quantity, item.quantity), unitPrice, unitHours };
+  });
+  const phone = body.phone === undefined ? order.phone : readPhone(body.phone);
+  const note = body.note === undefined ? order.customer_note : optionalText(body.note, 500);
+  const total = summarise(items, pricing);
 
-  const changed = db.prepare('UPDATE orders SET color=?, quantity=?, phone=?, customer_note=?, estimated_price=?, estimated_hours=?, unit_price=?, unit_hours=?, updated_at=? WHERE id=? AND user_id=? AND status=?')
-    .run(color, quantity, phone, note, round(orderTotal(pricing, unitPrice, quantity)), round(unitHours * quantity), unitPrice, unitHours, new Date().toISOString(), id, userId, EDITABLE_STATUS).changes;
-  // The shop may have picked the order up between the read and the write.
-  if (!changed) throw new OrderError(LOCKED);
-  return listOrders(userId).find((order) => order.id === id)!;
+  transaction(db, () => {
+    // The status check is part of the write: the shop may have picked the order up a moment ago.
+    const changed = db.prepare('UPDATE orders SET color=?, quantity=?, phone=?, customer_note=?, estimated_price=?, estimated_hours=?, updated_at=? WHERE id=? AND user_id=? AND status=?')
+      .run(total.color, total.quantity, phone, note, total.price, total.hours, new Date().toISOString(), id, userId, EDITABLE_STATUS).changes;
+    if (!changed) throw new OrderError(LOCKED);
+    const update = db.prepare('UPDATE order_items SET color=?, quantity=?, unit_price=?, unit_hours=? WHERE id=? AND order_id=?');
+    for (const item of items) update.run(item.color, item.quantity, item.unitPrice, item.unitHours, item.id, id);
+  });
+  return listOrders(userId).find((row) => row.id === id)!;
 }
 
 /** Deletes a customer's own order, with its files, while it is still pending. */
 export async function deleteOwnOrder(userId: string, id: unknown) {
-  if (typeof id !== 'string') throw new OrderError('الطلب غير موجود.');
+  if (typeof id !== 'string') throw new NotFound();
   const db = getDb();
   if (!db.prepare('DELETE FROM orders WHERE id=? AND user_id=? AND status=?').run(id, userId, EDITABLE_STATUS).changes) {
     if (!db.prepare('SELECT 1 FROM orders WHERE id=? AND user_id=?').get(id, userId)) throw new NotFound();
@@ -171,8 +293,8 @@ export async function deleteOwnOrder(userId: string, id: unknown) {
 // ---------- Admin ----------
 
 export function listAllOrders() {
-  const rows = getDb().prepare(`SELECT ${ORDER_FIELDS.split(', ').map((field) => `o.${field}`).join(', ')}, o.user_id, u.email, u.first_name, u.last_name FROM orders o JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC LIMIT 2000`).all() as unknown as Omit<AdminOrderRow, 'files'>[];
-  return withFiles(rows) as AdminOrderRow[];
+  const rows = getDb().prepare(`SELECT ${ORDER_FIELDS.split(', ').map((field) => `o.${field}`).join(', ')}, o.user_id, u.email, u.first_name, u.last_name FROM orders o JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC LIMIT 2000`).all() as unknown as Omit<AdminOrderRow, 'items' | 'files'>[];
+  return withDetails(rows) as AdminOrderRow[];
 }
 
 /** Admin edits: status, the confirmed final price (or null to clear it), and a note the customer can see. */

@@ -45,17 +45,21 @@ const custom = await upload(customOrder, first.cookie, { images: [webp] });
 assert.equal(custom.status, 201);
 assert.ok(custom.body.order.estimated_price > 1);
 assert.equal(custom.body.order.design_name, 'part.stl');
-assert.deepEqual(custom.body.order.files.map((file) => file.kind), ['model', 'image']);
+// Older single-design uploads become one order item; photos stay on the order.
+assert.equal(custom.body.order.items.length, 1);
+assert.deepEqual(custom.body.order.items[0].files.map((file) => file.kind), ['model']);
+assert.deepEqual(custom.body.order.files.map((file) => file.kind), ['image']);
+const customModel = custom.body.order.items[0].files[0];
 const fileUrl = (order, file) => `${origin}/api/orders/${order.id}/files/${file.id}`;
-const modelDownload = await fetch(fileUrl(custom.body.order, custom.body.order.files[0]), { headers: { Cookie: first.cookie } });
+const modelDownload = await fetch(fileUrl(custom.body.order, customModel), { headers: { Cookie: first.cookie } });
 assert.equal(modelDownload.status, 200);
 assert.equal(await modelDownload.text(), 'solid part\nendsolid part\n');
-assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[1]), { headers: { Cookie: first.cookie } })).headers.get('content-type'), 'image/webp');
-assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]))).status, 401);
+assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]), { headers: { Cookie: first.cookie } })).headers.get('content-type'), 'image/webp');
+assert.equal((await fetch(fileUrl(custom.body.order, customModel))).status, 401);
 // The browser sends a picture of the model; it is stored as its own file and served as an image.
 const withPreview = await upload(customOrder, first.cookie, { preview: webp });
 assert.equal(withPreview.status, 201);
-const previewFile = withPreview.body.order.files.find((file) => file.kind === 'preview');
+const previewFile = withPreview.body.order.items[0].files.find((file) => file.kind === 'preview');
 assert.ok(previewFile);
 assert.equal((await fetch(fileUrl(withPreview.body.order, previewFile), { headers: { Cookie: first.cookie } })).headers.get('content-type'), 'image/webp');
 assert.equal((await upload(customOrder, first.cookie, { preview: new Blob(['not an image']) })).status, 400);
@@ -67,12 +71,51 @@ assert.equal((await upload(customOrder, first.cookie, { modelName: 'part.exe' })
 assert.equal((await upload({ ...customOrder, volumeMm3: -5 }, first.cookie)).status, 400);
 assert.equal((await upload({ ...customOrder, material: 'gold' }, first.cookie)).status, 400);
 
+// One order can hold several designs, each with its own settings, and a design can be split into part files.
+async function uploadMany(items, cookie, files) {
+  const form = new FormData();
+  form.set('order', JSON.stringify({ kind: 'custom', phone: '01011112222', items }));
+  for (const [name, blob, fileName] of files) form.append(name, blob, fileName);
+  const response = await fetch(`${origin}/api/orders`, { method: 'POST', headers: { Origin: origin, Cookie: cookie }, body: form });
+  return { status: response.status, body: await response.json() };
+}
+const part = { volumeMm3: 10000, dimensionsMm: { x: 20, y: 20, z: 25 } };
+const twoDesigns = [
+  { material: 'petg', infill: 20, colorId: 'black', quantity: 2, parts: [part, part] },
+  { material: 'petg', infill: 20, colorId: 'blue', quantity: 1, parts: [part] },
+];
+const many = await uploadMany(twoDesigns, first.cookie, [['model-0', stl, 'base.stl'], ['model-0', stl, 'lid.stl'], ['preview-0', webp, 'preview.webp'], ['model-1', stl, 'clip.stl'], ['images', webp, 'photo.webp']]);
+assert.equal(many.status, 201);
+assert.equal(many.body.order.items.length, 2);
+assert.deepEqual(many.body.order.items[0].files.map((file) => file.name), ['preview.webp', 'base.stl', 'lid.stl']);
+assert.deepEqual(many.body.order.items[1].files.map((file) => file.name), ['clip.stl']);
+assert.equal(many.body.order.files.length, 1);
+assert.equal(many.body.order.items[1].color, 'blue');
+assert.equal(many.body.order.quantity, 3);
+// One piece of the first design costs both of its parts; the order total covers every piece of every design.
+assert.ok(Math.abs(many.body.order.items[0].unit_price - 2 * custom.body.order.items[0].unit_price) < 0.01);
+assert.ok(Math.abs(many.body.order.estimated_price - (2 * many.body.order.items[0].unit_price + many.body.order.items[1].unit_price)) < 0.02);
+assert.equal((await fetch(fileUrl(many.body.order, many.body.order.items[0].files[2]), { headers: { Cookie: first.cookie } })).status, 200);
+// The measurements must match the files, every design needs a file, and an order has at most 10 designs.
+assert.equal((await uploadMany(twoDesigns, first.cookie, [['model-0', stl, 'base.stl'], ['model-1', stl, 'clip.stl']])).status, 400);
+assert.equal((await uploadMany(twoDesigns, first.cookie, [['model-0', stl, 'base.stl'], ['model-0', stl, 'lid.stl']])).status, 409);
+const eleven = Array.from({ length: 11 }, () => ({ material: 'petg', infill: 20, colorId: 'black', quantity: 1, parts: [part] }));
+assert.equal((await uploadMany(eleven, first.cookie, eleven.map((_, index) => [`model-${index}`, stl, 'p.stl']))).status, 400);
+// Each design's color and quantity can be changed while the order is pending.
+const editMany = await fetch(`${origin}/api/orders/${many.body.order.id}`, { method: 'PATCH', headers: { Origin: origin, Cookie: first.cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ id: many.body.order.items[1].id, quantity: 4, colorId: 'black' }] }) });
+assert.equal(editMany.status, 200);
+const editedMany = (await editMany.json()).order;
+assert.equal(editedMany.items[1].quantity, 4);
+assert.equal(editedMany.items[1].color, 'black');
+assert.equal(editedMany.quantity, 6);
+assert.ok(Math.abs(editedMany.estimated_price - (2 * editedMany.items[0].unit_price + 4 * editedMany.items[1].unit_price)) < 0.02);
+
 const second = await request('/api/auth', { action: 'signup', email: `b-${suffix}@example.test`, password, firstName: 'Test', lastName: 'Two' });
 assert.equal(second.status, 200);
 assert.equal((await request('/api/orders', undefined, second.cookie)).body.orders.length, 0);
 // Another customer cannot read someone else's attachments.
-assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]), { headers: { Cookie: second.cookie } })).status, 404);
-assert.equal((await request('/api/orders', undefined, first.cookie)).body.orders.length, 3);
+assert.equal((await fetch(fileUrl(custom.body.order, customModel), { headers: { Cookie: second.cookie } })).status, 404);
+assert.equal((await request('/api/orders', undefined, first.cookie)).body.orders.length, 4);
 assert.equal((await request('/api/auth', { action: 'profile', first_name: 'Changed', last_name: 'One', avatar_url: '' }, first.cookie)).body.user.first_name, 'Changed');
 assert.equal((await request('/api/auth', { action: 'profile', first_name: 'Bad', last_name: 'Avatar', avatar_url: 'javascript:alert(1)' }, first.cookie)).status, 400);
 await request('/api/auth', { action: 'logout' }, first.cookie);
@@ -80,7 +123,7 @@ assert.equal((await request('/api/orders', undefined, first.cookie)).status, 401
 assert.equal((await request('/api/auth', { action: 'login', email: `a-${suffix}@example.test`, password: 'incorrect-password' })).status, 400);
 const loggedIn = await request('/api/auth', { action: 'login', email: `a-${suffix}@example.test`, password });
 assert.equal(loggedIn.status, 200);
-assert.equal((await request('/api/orders', undefined, loggedIn.cookie)).body.orders.length, 3);
+assert.equal((await request('/api/orders', undefined, loggedIn.cookie)).body.orders.length, 4);
 
 // Quantity and contact details are stored; the total is still computed on the server.
 const multi = await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue', quantity: 3, phone: '01012345678', note: 'pickup Friday' }, loggedIn.cookie);
@@ -114,7 +157,7 @@ assert.equal((await change('PATCH', multi.body.order.id, { quantity: 1 }, logged
 // Deleting a custom order also removes its files.
 const doomed = await upload(customOrder, loggedIn.cookie);
 assert.equal((await change('DELETE', doomed.body.order.id, undefined, loggedIn.cookie)).status, 200);
-assert.equal((await fetch(fileUrl(doomed.body.order, doomed.body.order.files[0]), { headers: { Cookie: loggedIn.cookie } })).status, 404);
+assert.equal((await fetch(fileUrl(doomed.body.order, doomed.body.order.items[0].files[0]), { headers: { Cookie: loggedIn.cookie } })).status, 404);
 
 // Customers cannot reach the admin dashboard API.
 assert.equal((await request('/api/admin/orders', undefined, loggedIn.cookie)).status, 403);
@@ -153,7 +196,7 @@ if (adminEmail) {
   assert.deepEqual((await request('/api/admin/settings', withPhotos, admin.cookie)).body.pricing.designs[0].images, [photoUrl]);
   assert.equal((await request('/api/admin/settings', { ...original, designs: original.designs.map((design) => ({ ...design, images: ['javascript:alert(1)'] })) }, admin.cookie)).status, 400);
   // An admin can download any customer's file.
-  assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]), { headers: { Cookie: admin.cookie } })).status, 200);
+  assert.equal((await fetch(fileUrl(custom.body.order, customModel), { headers: { Cookie: admin.cookie } })).status, 200);
 
   // Pausing orders refuses new ones.
   assert.equal((await request('/api/admin/settings', { ...changed, acceptingOrders: false, notice: 'Closed for Eid' }, admin.cookie)).status, 200);

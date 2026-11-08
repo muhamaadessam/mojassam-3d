@@ -29,6 +29,15 @@ CREATE INDEX IF NOT EXISTS order_files_order ON order_files(order_id);`);
   for (const column of ['quantity INTEGER NOT NULL DEFAULT 1', "phone TEXT NOT NULL DEFAULT ''", "customer_note TEXT NOT NULL DEFAULT ''", 'final_price REAL', "admin_note TEXT NOT NULL DEFAULT ''", 'updated_at TEXT', 'unit_price REAL', 'unit_hours REAL']) {
     try { db.exec(`ALTER TABLE orders ADD COLUMN ${column}`); } catch { /* already added */ }
   }
+  try { db.exec('ALTER TABLE order_files ADD COLUMN item_id TEXT'); } catch { /* already added */ }
+  // An order holds one or more designs. Orders from before that become a single design, and their
+  // model and preview files move to it; the item reuses the order id so the step can safely run again.
+  db.exec(`CREATE TABLE IF NOT EXISTS order_items (id TEXT PRIMARY KEY, order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE, position INTEGER NOT NULL, design_id TEXT, name TEXT NOT NULL, material TEXT, color TEXT, infill REAL, quantity INTEGER NOT NULL, unit_price REAL, unit_hours REAL);
+CREATE INDEX IF NOT EXISTS order_items_order ON order_items(order_id, position);
+INSERT INTO order_items(id, order_id, position, design_id, name, material, color, infill, quantity, unit_price, unit_hours)
+  SELECT o.id, o.id, 0, o.design_id, o.design_name, o.material, o.color, o.infill, o.quantity, o.unit_price, o.unit_hours FROM orders o
+  WHERE NOT EXISTS (SELECT 1 FROM order_items i WHERE i.order_id = o.id);
+UPDATE order_files SET item_id = order_id WHERE item_id IS NULL AND kind != 'image';`);
   database = db;
   return db;
 }

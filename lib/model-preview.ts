@@ -51,22 +51,53 @@ export function placeOnFloor(model: THREE.Object3D) {
   return box;
 }
 
+/**
+ * Lines the parts of a design up side by side along X, each standing on the floor, with the row centred.
+ * Returns the bounding box of the whole row.
+ */
+export function arrangeParts(parts: THREE.Object3D[]) {
+  const boxes = parts.map((part) => new THREE.Box3().setFromObject(part));
+  const sizes = boxes.map((box) => box.getSize(new THREE.Vector3()));
+  const gap = Math.max(2, ...sizes.map((size) => Math.max(size.x, size.z) * 0.15));
+  const width = sizes.reduce((sum, size) => sum + size.x, 0) + gap * Math.max(0, parts.length - 1);
+  let cursor = -width / 2;
+  parts.forEach((part, index) => {
+    const box = boxes[index];
+    part.position.x += cursor - box.min.x;
+    part.position.z -= (box.min.z + box.max.z) / 2;
+    part.position.y -= box.min.y;
+    cursor += sizes[index].x + gap;
+  });
+  const row = new THREE.Box3();
+  parts.forEach((part) => row.expandByObject(part));
+  return row;
+}
+
 // Browsers allow only a few WebGL contexts at once, so previews are drawn one after another.
 let queue: Promise<unknown> = Promise.resolve();
 
-/** Draws the model from a three-quarter angle on a transparent background and returns it as a WebP image. */
-export function renderModelPreview(file: Blob, name: string, color: string): Promise<File> {
-  const job = queue.then(() => render(file, name, color));
+type ModelSource = { blob: Blob; name: string };
+
+/** Draws a design (all of its parts, side by side) from a three-quarter angle on a transparent background, as a WebP image. */
+export function renderModelPreview(sources: ModelSource[], color: string): Promise<File> {
+  const job = queue.then(() => render(sources, color));
   queue = job.catch(() => undefined);
   return job;
 }
 
-async function render(file: Blob, name: string, color: string) {
-  const format = getFormat(name);
-  if (!format) throw new Error('Unsupported model');
-  const model = await parseModel(await file.arrayBuffer(), format);
-  placeOnFloor(model);
-  applyModelStyle(model, color);
+async function render(sources: ModelSource[], color: string) {
+  const model = new THREE.Group();
+  const parts = await Promise.all(sources.map(async ({ blob, name }) => {
+    const format = getFormat(name);
+    if (!format) throw new Error('Unsupported model');
+    const part = await parseModel(await blob.arrayBuffer(), format);
+    placeOnFloor(part);
+    applyModelStyle(part, color);
+    return part;
+  }));
+  if (!parts.length) throw new Error('No model');
+  arrangeParts(parts);
+  parts.forEach((part) => model.add(part));
 
   const scene = new THREE.Scene();
   scene.add(model);

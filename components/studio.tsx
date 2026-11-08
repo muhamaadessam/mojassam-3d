@@ -5,26 +5,30 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import SiteHeader from './site-header';
 import { ShieldIcon, UploadIcon } from './icons';
-import { estimateCustomPrint, MAX_ORDER_IMAGES, orderTotal, publicCatalog, type Pricing, type PrintColor } from '@/lib/catalog';
+import { estimateCustomPrint, MAX_ITEM_PARTS, MAX_ORDER_IMAGES, MAX_ORDER_ITEMS, MAX_ORDER_UPLOAD, orderTotal, publicCatalog, type Material, type Pricing, type PrintColor } from '@/lib/catalog';
 import OrderExtras, { EMPTY_EXTRAS } from './order-extras';
 import ImagePicker, { type PickedImage } from './image-picker';
 import { COPY, type FileErrorKey } from '@/lib/copy';
 import { formatBytes, formatNumber, getFormat, validateModelFile, type SupportedFormat } from '@/lib/model-file';
 import { clearPendingFile, readPendingFile } from '@/lib/pending-file';
 import { useLanguage } from '@/lib/language';
-import { applyModelStyle, disposeObject, parseModel, placeOnFloor, renderModelPreview } from '@/lib/model-preview';
+import { applyModelStyle, arrangeParts, disposeObject, parseModel, placeOnFloor, renderModelPreview } from '@/lib/model-preview';
 
 type ViewerState = 'idle' | 'loading' | 'ready' | 'error';
 type UnitKey = 'mm' | 'cm' | 'in';
-type OrderState = 'idle' | 'saving' | 'saved' | 'login' | 'failed' | 'paused';
-type ModelMetadata = {
+type OrderState = 'idle' | 'saving' | 'saved' | 'login' | 'failed' | 'paused' | 'tooLarge' | 'tooMany';
+/** One file of the design being previewed. A design split into pieces has one part per piece. */
+type Part = {
+  key: number;
+  file: File;
   format: SupportedFormat;
-  fileName: string;
-  fileSize: number;
   dimensionsMm: THREE.Vector3;
   volumeMm3: number | null;
   triangleCount: number;
 };
+/** A design already added to the order, with the settings it was priced at. */
+type CartItem = { key: number; parts: Part[]; material: Material; infill: number; color: PrintColor; quantity: number; unitPrice: number };
+type Estimate = ReturnType<typeof estimateCustomPrint>;
 
 const UNIT_FACTORS: Record<UnitKey, number> = { mm: 1, cm: 0.1, in: 1 / 25.4 };
 
@@ -74,20 +78,38 @@ function calculateVolumeAndTriangles(object: THREE.Object3D) {
   };
 }
 
+/** Price of one piece of a design: its parts print separately, so their estimates add up. */
+function estimateDesign(parts: Part[], infill: number, material: Material, pricing: Pricing): Estimate | null {
+  if (!parts.length || parts.some((part) => !part.volumeMm3)) return null;
+  return parts
+    .map((part) => estimateCustomPrint(part.volumeMm3!, part.dimensionsMm, infill, material, pricing))
+    .reduce((sum, estimate) => ({
+      weightGrams: sum.weightGrams + estimate.weightGrams,
+      materialCost: sum.materialCost + estimate.materialCost,
+      hours: sum.hours + estimate.hours,
+      machineCost: sum.machineCost + estimate.machineCost,
+      price: sum.price + estimate.price,
+    }));
+}
+
 export default function StudioPage({ pricing }: { pricing: Pricing }) {
   const { materials, colors } = publicCatalog(pricing);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewerHostRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const modelRef = useRef<THREE.Object3D | null>(null);
+  /** Holds the parts of the design being previewed. */
+  const designRef = useRef<THREE.Group | null>(null);
+  const objectsRef = useRef(new Map<number, THREE.Object3D>());
+  const partsRef = useRef<Part[]>([]);
+  const nextKeyRef = useRef(1);
   const gridRef = useRef<THREE.GridHelper | null>(null);
 
   const { language, toggleLanguage } = useLanguage();
   const [viewerState, setViewerState] = useState<ViewerState>('idle');
-  const [metadata, setMetadata] = useState<ModelMetadata | null>(null);
+  const [parts, setParts] = useState<Part[]>([]);
   const [error, setError] = useState<FileErrorKey | null>(null);
+  const [partsFailed, setPartsFailed] = useState(false);
   const [materialKey, setMaterialKey] = useState(materials[0].id);
   const [extras, setExtras] = useState(EMPTY_EXTRAS);
   const [unit, setUnit] = useState<UnitKey>('mm');
@@ -99,8 +121,7 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
   const [estimateRequested, setEstimateRequested] = useState(false);
   const [orderState, setOrderState] = useState<OrderState>('idle');
   const [photos, setPhotos] = useState<PickedImage[]>([]);
-  /** The model being previewed; it is uploaded with the order. */
-  const modelFileRef = useRef<File | null>(null);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const text = COPY[language];
 
   useEffect(() => {
@@ -110,6 +131,7 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
   useEffect(() => {
     const host = viewerHostRef.current;
     if (!host) return;
+    const objects = objectsRef.current;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(getThemeColor('--color-canvas'));
@@ -132,6 +154,8 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
 
     const grid = new THREE.GridHelper(160, 32, getThemeColor('--color-grid-major'), getThemeColor('--color-grid-minor'));
     scene.add(grid);
+    const design = new THREE.Group();
+    scene.add(design);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -160,21 +184,22 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
     };
     animate();
 
-    sceneRef.current = scene;
     cameraRef.current = camera;
     controlsRef.current = controls;
+    designRef.current = design;
     gridRef.current = grid;
 
     return () => {
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
-      if (modelRef.current) disposeObject(modelRef.current);
+      objects.forEach(disposeObject);
+      objects.clear();
       grid.geometry.dispose();
       (grid.material as THREE.Material).dispose();
       controls.dispose();
       renderer.dispose();
       renderer.domElement.remove();
-      sceneRef.current = null;
+      designRef.current = null;
     };
   }, []);
 
@@ -185,16 +210,16 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
 
   useEffect(() => {
     printColorRef.current = printColor.hex;
-    if (modelRef.current) applyModelStyle(modelRef.current, printColor.hex);
+    objectsRef.current.forEach((object) => applyModelStyle(object, printColor.hex));
   }, [printColor]);
 
   const fitModel = useCallback(() => {
-    const model = modelRef.current;
+    const design = designRef.current;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
-    if (!model || !camera || !controls) return;
+    if (!design || !camera || !controls || !design.children.length) return;
 
-    const box = new THREE.Box3().setFromObject(model);
+    const box = new THREE.Box3().setFromObject(design);
     const size = box.getSize(new THREE.Vector3());
     const maxSize = Math.max(size.x, size.y, size.z, 1);
     camera.position.set(maxSize * 1.65, maxSize * 1.2, maxSize * 1.9);
@@ -206,91 +231,161 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
     if (gridRef.current) gridRef.current.scale.setScalar(Math.max(1, maxSize / 70));
   }, []);
 
-  const loadFile = useCallback(async (file: File) => {
-    const problem = validateModelFile(file);
-    const format = getFormat(file.name);
-    if (problem || !format) {
+  /** Replaces the list of parts, lines them up in the viewer, and frames them. */
+  const commitParts = useCallback((next: Part[]) => {
+    partsRef.current = next;
+    setParts(next);
+    setEstimateRequested(false);
+    const objects = next.map((part) => objectsRef.current.get(part.key)).filter((object): object is THREE.Object3D => Boolean(object));
+    if (objects.length) arrangeParts(objects);
+    setViewerState(next.length ? 'ready' : 'idle');
+    requestAnimationFrame(fitModel);
+  }, [fitModel]);
+
+  /** Adds files as parts of the design being previewed. */
+  const loadFiles = useCallback(async (files: File[]) => {
+    if (!files.length) return;
+    setError(null);
+    setPartsFailed(false);
+    setOrderState('idle');
+    if (!partsRef.current.length) setViewerState('loading');
+    const added: Part[] = [];
+    let problem: FileErrorKey | null = null;
+    for (const file of files.slice(0, Math.max(0, MAX_ITEM_PARTS - partsRef.current.length))) {
+      const format = getFormat(file.name);
+      const invalid = validateModelFile(file);
+      if (invalid || !format) {
+        problem ??= invalid ?? 'unsupported';
+        continue;
+      }
+      try {
+        const object = await parseModel(await file.arrayBuffer(), format);
+        const dimensionsMm = placeOnFloor(object).getSize(new THREE.Vector3());
+        const { volumeMm3, triangleCount } = calculateVolumeAndTriangles(object);
+        applyModelStyle(object, printColorRef.current);
+        const key = nextKeyRef.current++;
+        objectsRef.current.set(key, object);
+        designRef.current?.add(object);
+        added.push({ key, file, format, dimensionsMm, volumeMm3, triangleCount });
+      } catch {
+        problem ??= 'parseError';
+      }
+    }
+    if (!added.length && !partsRef.current.length) {
       setViewerState('error');
-      setError(problem ?? 'unsupported');
+      setError(problem ?? 'parseError');
       return;
     }
+    setPartsFailed(Boolean(problem));
+    commitParts([...partsRef.current, ...added]);
+  }, [commitParts]);
 
-    setViewerState('loading');
-    setError(null);
-    setEstimateRequested(false);
-    setOrderState('idle');
-    try {
-      const model = await parseModel(await file.arrayBuffer(), format);
-      const box = placeOnFloor(model);
-      const dimensionsMm = box.getSize(new THREE.Vector3());
-      const { volumeMm3, triangleCount } = calculateVolumeAndTriangles(model);
-
-      if (modelRef.current && sceneRef.current) {
-        sceneRef.current.remove(modelRef.current);
-        disposeObject(modelRef.current);
-      }
-      modelRef.current = model;
-      modelFileRef.current = file;
-      sceneRef.current?.add(model);
-      applyModelStyle(model, printColorRef.current);
-      setMetadata({ fileName: file.name, fileSize: file.size, format, dimensionsMm, volumeMm3, triangleCount });
-      setViewerState('ready');
-      requestAnimationFrame(fitModel);
-    } catch {
-      setViewerState('error');
-      setError('parseError');
+  const removeObjects = (keys: number[]) => {
+    for (const key of keys) {
+      const object = objectsRef.current.get(key);
+      if (!object) continue;
+      designRef.current?.remove(object);
+      disposeObject(object);
+      objectsRef.current.delete(key);
     }
-  }, [fitModel]);
+  };
+
+  const removePart = (key: number) => {
+    removeObjects([key]);
+    setPartsFailed(false);
+    commitParts(partsRef.current.filter((part) => part.key !== key));
+  };
 
   // Open the file chosen on the home page, then forget it so it does not come back on every visit.
   useEffect(() => {
     void readPendingFile().then((file) => {
       if (!file) return;
-      void loadFile(file);
+      void loadFiles([file]);
       void clearPendingFile().catch(() => undefined);
     }).catch(() => undefined);
-  }, [loadFile]);
+  }, [loadFiles]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) void loadFile(file);
+    const files = Array.from(event.target.files ?? []);
     event.target.value = '';
+    void loadFiles(files);
   };
 
   const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
-    const file = event.dataTransfer.files?.[0];
-    if (file) void loadFile(file);
+    void loadFiles(Array.from(event.dataTransfer.files ?? []));
   };
 
   const selectedMaterial = materials.find((material) => material.id === materialKey) ?? materials[0];
-  const dimensions = metadata
-    ? [0, 1, 2].map((index) => `${formatNumber(metadata.dimensionsMm.getComponent(index) * UNIT_FACTORS[unit])} ${unit}`).join(' × ')
-    : '—';
-  const estimate = metadata?.volumeMm3 ? estimateCustomPrint(metadata.volumeMm3, metadata.dimensionsMm, infill, selectedMaterial, pricing) : null;
-  const total = estimate ? orderTotal(pricing, estimate.price, extras.quantity) : 0;
+  const dims = (part: Part) => [0, 1, 2].map((index) => formatNumber(part.dimensionsMm.getComponent(index) * UNIT_FACTORS[unit])).join(' × ') + ` ${unit}`;
+  const estimate = estimateDesign(parts, infill, selectedMaterial, pricing);
+  const currentIncluded = Boolean(estimateRequested && estimate);
+  const cartSubtotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const designTotal = estimate ? orderTotal(pricing, estimate.price, extras.quantity) : 0;
+  const orderAll = orderTotal(pricing, cartSubtotal + (currentIncluded && estimate ? estimate.price * extras.quantity : 0), 1);
+  const designCount = cart.length + (currentIncluded ? 1 : 0);
   const money = (value: number) => `${formatNumber(value)} ${text.currency}`;
+  const colorName = (color: PrintColor) => (language === 'ar' ? color.ar : color.en);
+  const materialName = (material: Material) => (material.id === 'pla' ? text.pla : material.id === 'petg' ? text.petg : material.label);
+  const fileTitle = parts.length ? `${parts[0].file.name}${parts.length > 1 ? ` + ${parts.length - 1}` : ''}` : text.noFile;
 
-  const orderFile = async () => {
-    const model = modelFileRef.current;
-    if (!metadata?.volumeMm3 || !model) return;
+  /** Keeps the current design in the order and clears the viewer for the next one. */
+  const addDesign = () => {
+    if (!estimate || cart.length >= MAX_ORDER_ITEMS) return;
+    setCart([...cart, { key: nextKeyRef.current++, parts: partsRef.current, material: selectedMaterial, infill, color: printColor, quantity: extras.quantity, unitPrice: estimate.price }]);
+    removeObjects(partsRef.current.map((part) => part.key));
+    commitParts([]);
+    setExtras({ ...extras, quantity: 1 });
+    setPartsFailed(false);
+    setOrderState('idle');
+  };
+
+  const orderFiles = async () => {
+    const designs: CartItem[] = [...cart, ...(currentIncluded && estimate ? [{ key: 0, parts: partsRef.current, material: selectedMaterial, infill, color: printColor, quantity: extras.quantity, unitPrice: estimate.price }] : [])];
+    if (!designs.length) return;
+    if (designs.length > MAX_ORDER_ITEMS) return setOrderState('tooMany');
+    const bytes = designs.flatMap((design) => design.parts).reduce((sum, part) => sum + part.file.size, 0) + photos.reduce((sum, photo) => sum + photo.file.size, 0);
+    if (bytes > MAX_ORDER_UPLOAD) return setOrderState('tooLarge');
     setOrderState('saving');
     try {
-      const { x, y, z } = metadata.dimensionsMm;
       const form = new FormData();
-      form.set('order', JSON.stringify({ kind: 'custom', material: selectedMaterial.id, infill, colorId: printColor.id, volumeMm3: metadata.volumeMm3, dimensionsMm: { x, y, z }, ...extras }));
-      form.set('model', model, model.name);
+      form.set('order', JSON.stringify({
+        kind: 'custom',
+        phone: extras.phone,
+        note: extras.note,
+        items: designs.map((design) => ({
+          material: design.material.id,
+          infill: design.infill,
+          colorId: design.color.id,
+          quantity: design.quantity,
+          parts: design.parts.map(({ volumeMm3, dimensionsMm: { x, y, z } }) => ({ volumeMm3, dimensionsMm: { x, y, z } })),
+        })),
+      }));
+      for (const [index, design] of designs.entries()) {
+        design.parts.forEach((part) => form.append(`model-${index}`, part.file, part.file.name));
+        // A picture of the design, so the order list shows what was ordered without opening the files.
+        const preview = await renderModelPreview(design.parts.map((part) => ({ blob: part.file, name: part.file.name })), design.color.hex).catch(() => null);
+        if (preview) form.set(`preview-${index}`, preview, preview.name);
+      }
       photos.forEach((photo) => form.append('images', photo.file, photo.file.name));
-      // A picture of the model, so the order list shows what was ordered without opening the file.
-      const preview = await renderModelPreview(model, model.name, printColor.hex).catch(() => null);
-      if (preview) form.set('preview', preview, preview.name);
       const response = await fetch('/api/orders', { method: 'POST', body: form });
-      setOrderState(response.status === 401 ? 'login' : response.ok ? 'saved' : response.status === 409 ? 'paused' : 'failed');
+      const state = response.status === 401 ? 'login' : response.ok ? 'saved' : response.status === 409 ? 'paused' : 'failed';
+      if (state === 'saved') setCart([]);
+      setOrderState(state);
     } catch {
       setOrderState('failed');
     }
   };
-  const orderMessage = { idle: '', saving: text.orderUploading, saved: text.orderConfirmed, login: text.loginRequired, failed: text.orderFailed, paused: pricing.notice || text.ordersPaused }[orderState];
+  const orderMessage = {
+    idle: '',
+    saving: text.orderUploading,
+    saved: text.orderConfirmed,
+    login: text.loginRequired,
+    failed: text.orderFailed,
+    paused: pricing.notice || text.ordersPaused,
+    tooLarge: text.uploadTooLarge,
+    tooMany: text.tooManyDesigns(MAX_ORDER_ITEMS),
+  }[orderState];
 
   return (
     <main className="app-shell">
@@ -303,10 +398,10 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
       <div className="workspace" id="studio">
         <section className="viewer-card" aria-label={language === 'ar' ? 'مساحة عرض التصميم ثلاثي الأبعاد' : '3D design preview area'}>
           <div className="viewer-header">
-            <div><p className="eyebrow" lang="en">LIVE PREVIEW</p><strong>{metadata?.fileName ?? text.noFile}</strong></div>
+            <div><p className="eyebrow" lang="en">LIVE PREVIEW</p><strong dir="auto">{fileTitle}</strong></div>
             <div className="viewer-badges">
-              <span className="soft-badge">{metadata ? metadata.format.toUpperCase() : 'STL · OBJ · 3MF'}</span>
-              <button className="ghost-button" onClick={() => controlsRef.current?.reset()} disabled={!metadata}>{text.reset}</button>
+              <span className="soft-badge">{parts.length ? [...new Set(parts.map((part) => part.format.toUpperCase()))].join(' · ') : 'STL · OBJ · 3MF'}</span>
+              <button className="ghost-button" onClick={() => controlsRef.current?.reset()} disabled={!parts.length}>{text.reset}</button>
             </div>
           </div>
 
@@ -352,20 +447,32 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
           >
-            <input ref={fileInputRef} type="file" accept=".stl,.obj,.3mf" onChange={handleFileChange} />
+            <input ref={fileInputRef} type="file" accept=".stl,.obj,.3mf" multiple onChange={handleFileChange} />
             <span className="dropzone-icon"><UploadIcon size={18} /></span>
             <span className="dropzone-title">{text.dropTitle}</span>
             <span className="dropzone-subtitle">{text.dropSubtitle}</span>
-            <span className="dropzone-formats">STL · OBJ · 3MF <i>{language === 'ar' ? 'حتى 50MB' : 'up to 50MB'}</i></span>
+            <span className="dropzone-formats">STL · OBJ · 3MF <i>{language === 'ar' ? 'حتى 50MB للملف' : 'up to 50MB each'}</i></span>
           </label>
 
-          {metadata && (
+          {parts.length > 0 && (
             <section className="info-section">
-              <div className="section-heading"><span>{text.designData}</span><span className="file-chip">.{metadata.format}</span></div>
+              <div className="section-heading"><span>{text.designData}</span><span className="file-chip">{text.partsCount(parts.length)}</span></div>
               <div className="stat-grid">
-                <div><span>{text.fileSize}</span><strong>{formatBytes(metadata.fileSize)}</strong></div>
-                <div><span>{text.triangles}</span><strong>{formatNumber(metadata.triangleCount, 0)}</strong></div>
-                <div className="wide-stat"><span>{text.dimensions} ({unit})</span><strong>{dimensions}</strong></div>
+                <div><span>{text.fileSize}</span><strong>{formatBytes(parts.reduce((sum, part) => sum + part.file.size, 0))}</strong></div>
+                <div><span>{text.triangles}</span><strong>{formatNumber(parts.reduce((sum, part) => sum + part.triangleCount, 0), 0)}</strong></div>
+              </div>
+              <div className="parts-list">
+                <span className="parts-list-title">{text.parts} · {text.dimensions} ({unit})</span>
+                {parts.map((part) => (
+                  <div className="part-row" key={part.key}>
+                    <span className="part-name" dir="ltr">{part.file.name}</span>
+                    <small dir="ltr">{dims(part)}</small>
+                    <button type="button" className="part-remove" onClick={() => removePart(part.key)} aria-label={`${text.removePart}: ${part.file.name}`}>×</button>
+                  </div>
+                ))}
+                {parts.length < MAX_ITEM_PARTS && <button type="button" className="ghost-button part-add" onClick={() => fileInputRef.current?.click()}>{text.addPart}</button>}
+                <p className="parts-hint">{text.partsHint}</p>
+                {partsFailed && <p className="parts-error" role="alert">{text.partsFailed}</p>}
               </div>
               <div className="control-row">
                 <label htmlFor="unit">{text.unit}</label>
@@ -381,7 +488,7 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
           <section className="pricing-card">
             <div className="section-heading"><span>{text.estimate}</span><span className="estimate-badge">{text.preliminary}</span></div>
             <div className="pricing-controls">
-              <label>{text.material}<select value={selectedMaterial.id} onChange={(event) => setMaterialKey(event.target.value)}>{materials.map((material) => <option key={material.id} value={material.id}>{material.id === 'pla' ? text.pla : material.id === 'petg' ? text.petg : material.label}</option>)}</select></label>
+              <label>{text.material}<select value={selectedMaterial.id} onChange={(event) => setMaterialKey(event.target.value)}>{materials.map((material) => <option key={material.id} value={material.id}>{materialName(material)}</option>)}</select></label>
               <label>{text.infill} <output>{infill}%</output><input type="range" min="10" max="100" step="5" value={infill} onChange={(event) => setInfill(Number(event.target.value))} /></label>
               <label className="auto-hours"><span>{text.printHours}</span><output>{estimate ? `${formatNumber(estimate.hours, 2)} ${text.hoursUnit}` : '—'}</output></label>
             </div>
@@ -394,7 +501,7 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
                     className={`color-swatch ${printColor.id === color.id ? 'selected' : ''}`}
                     style={{ backgroundColor: color.hex }}
                     onClick={() => setPrintColor(color)}
-                    aria-label={language === 'ar' ? color.ar : color.en}
+                    aria-label={colorName(color)}
                     role="radio"
                     aria-checked={printColor.id === color.id}
                     type="button"
@@ -404,29 +511,52 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
             </div>
             {!estimateRequested && (
               <div className="estimate-action">
-                <p>{metadata ? text.calculatePrompt : text.noEstimate}</p>
+                <p>{parts.length ? text.calculatePrompt : text.noEstimate}</p>
                 <button className="primary-button estimate-button" disabled={!estimate} onClick={() => setEstimateRequested(true)}>{text.calculateCost}</button>
               </div>
             )}
             {estimateRequested && (
               <div className="price-result">
-                <span>{text.totalCost}</span>
-                <strong>{estimate ? <>{formatNumber(total)} <small>{text.currency}</small></> : '—'}</strong>
+                <span>{cart.length ? text.thisDesign : text.totalCost}</span>
+                <strong>{estimate ? <>{formatNumber(cart.length ? estimate.price * extras.quantity : designTotal)} <small>{text.currency}</small></> : '—'}</strong>
                 <div className="cost-breakdown">
                   <span>{text.materialCost}<b>{estimate ? money(estimate.materialCost) : '—'}</b></span>
                   <span>{text.machineCost}<b>{estimate ? money(estimate.machineCost) : '—'}</b></span>
                 </div>
                 <p>{estimate ? text.weightDetails(formatNumber(estimate.weightGrams, 1), formatNumber(selectedMaterial.rate, 0)) : text.noEstimate}</p>
-                {estimate && (
-                  <div className="estimate-action">
-                    {(pricing.setupFee > 0 || pricing.minimumPrice > 0) && <p>{[pricing.setupFee > 0 && text.setupFee(formatNumber(pricing.setupFee, 0)), pricing.minimumPrice > 0 && text.minimumPrice(formatNumber(pricing.minimumPrice, 0))].filter(Boolean).join(' · ')}</p>}
-                    <OrderExtras text={text} value={extras} onChange={setExtras} />
-                    <ImagePicker images={photos} onChange={setPhotos} max={MAX_ORDER_IMAGES} label={text.refPhotos} hint={text.refPhotosHint} text={text.imageText} />
-                    <p>{text.orderFileNote}</p>
-                    <button className="primary-button estimate-button" disabled={!pricing.acceptingOrders || orderState === 'saving' || orderState === 'saved'} onClick={orderFile}>{orderState === 'saving' ? text.orderSaving : text.orderThisFile}</button>
-                    {orderMessage && <p role="status" className="studio-order-message">{orderMessage}</p>}
+              </div>
+            )}
+            {(currentIncluded || cart.length > 0) && (
+              <div className="estimate-action order-builder">
+                {cart.length > 0 && (
+                  <div className="cart-list">
+                    <span className="cart-title">{text.cartTitle}</span>
+                    {cart.map((item) => (
+                      <div className="cart-item" key={item.key}>
+                        <i className="cart-swatch" style={{ background: item.color.hex }} aria-hidden="true" />
+                        <div>
+                          <strong dir="auto">{item.parts[0].file.name}</strong>
+                          <small>{text.partsCount(item.parts.length)} · {materialName(item.material)} · {colorName(item.color)} · {item.infill}% · × {item.quantity}</small>
+                        </div>
+                        <b>{money(item.unitPrice * item.quantity)}</b>
+                        <button type="button" className="part-remove" onClick={() => setCart(cart.filter((other) => other.key !== item.key))} aria-label={`${text.removeDesign}: ${item.parts[0].file.name}`}>×</button>
+                      </div>
+                    ))}
+                    <div className="cart-total"><span>{text.orderTotal}</span><strong>{money(orderAll)}</strong></div>
                   </div>
                 )}
+                {(pricing.setupFee > 0 || pricing.minimumPrice > 0) && <p>{[pricing.setupFee > 0 && text.setupFee(formatNumber(pricing.setupFee, 0)), pricing.minimumPrice > 0 && text.minimumPrice(formatNumber(pricing.minimumPrice, 0))].filter(Boolean).join(' · ')}</p>}
+                <OrderExtras text={text} value={extras} onChange={setExtras} />
+                {currentIncluded && cart.length < MAX_ORDER_ITEMS && (
+                  <>
+                    <button type="button" className="ghost-button add-design-button" onClick={addDesign} disabled={orderState === 'saving'}>{text.addDesign}</button>
+                    <p className="parts-hint">{text.addDesignHint}</p>
+                  </>
+                )}
+                <ImagePicker images={photos} onChange={setPhotos} max={MAX_ORDER_IMAGES} label={text.refPhotos} hint={text.refPhotosHint} text={text.imageText} />
+                <p>{text.orderFileNote}</p>
+                <button className="primary-button estimate-button" disabled={!pricing.acceptingOrders || !designCount || orderState === 'saving' || orderState === 'saved'} onClick={orderFiles}>{orderState === 'saving' ? text.orderSaving : designCount > 1 ? text.sendOrder(designCount) : text.orderThisFile}</button>
+                {orderMessage && <p role="status" className="studio-order-message">{orderMessage}</p>}
               </div>
             )}
             <p className="fine-print">{text.estimateNote} · {text.hourlyRate(formatNumber(pricing.machineHourlyRate, 0))}</p>
