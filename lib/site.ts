@@ -1,7 +1,7 @@
 // Single source of truth for SEO / AEO / GEO metadata. Safe for server and client.
 import { getReadyPrice, orderTotal, publicCatalog, type Pricing } from './catalog';
 
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://mojassam3d.muhammadessam.me').replace(/\/$/, '');
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://etba3-bas.muhammadessam.me').replace(/\/$/, '');
 export const SITE_NAME = 'Etba3 Bas';
 export const SITE_NAME_AR = 'اطبع بس';
 

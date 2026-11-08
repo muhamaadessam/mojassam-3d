@@ -4,8 +4,8 @@
 
 ## Pages
 
-- [Home](https://mojassam3d.muhammadessam.me/): overview, file upload entry, ready-to-print designs store, and FAQ.
-- [Studio — preview & pricing](https://mojassam3d.muhammadessam.me/studio): interactive 3D viewer with material, infill, and color options and a live preliminary estimate.
+- [Home](https://etba3-bas.muhammadessam.me/): overview, file upload entry, ready-to-print designs store, and FAQ.
+- [Studio — preview & pricing](https://etba3-bas.muhammadessam.me/studio): interactive 3D viewer with material, infill, and color options and a live preliminary estimate.
 
 ## Key facts
 

@@ -1,12 +1,12 @@
 # Etba3 Bas (اطبع بس) — Namecheap
 
-The app was renamed from Mojassam 3D. Server paths, the domain, cookie names, and the database file still use the old `mojassam` name on purpose, so existing sessions and deploys keep working.
+The app was renamed from Mojassam 3D. Server paths, cookie names, and the database file retain the internal `mojassam` name to preserve customer data and deployment history. The public domain is `etba3-bas.muhammadessam.me`. Customers sign in again on the new host; their accounts and orders are unchanged.
 
-Production: https://mojassam3d.muhammadessam.me
+Production: https://etba3-bas.muhammadessam.me
 
 Run Node.js 24 in cPanel, production mode. Build with `npm ci && npm run build`.
 Deploy `.next/standalone`, `.next/static`, and `public` in an app directory outside the document root.
-Use `server.cjs` as the Passenger startup file. Set `APP_ORIGIN=https://mojassam3d.muhammadessam.me` and `DATA_DIRECTORY=/home/konobbue/mojassam-data`.
+Use `server.cjs` as the Passenger startup file. Set `APP_ORIGIN=https://etba3-bas.muhammadessam.me` and `DATA_DIRECTORY=/home/konobbue/mojassam-data`.
 Set `ADMIN_EMAILS` to the shop owner's email (comma-separated for several). That account signs up normally on the site, then opens `/admin` to manage orders, gram prices, machine-hour rate, colors, and ready designs. Without it nobody can open the dashboard.
 `APP_ORIGIN` is required in production: without it every sign-in, profile change, and order is rejected (403) and the log says so.
 Login rate limits use the last `X-Forwarded-For` entry that the host's proxy adds, so the app must only be reachable through that proxy.
@@ -30,3 +30,5 @@ Install `scripts/receive-namecheap.sh` and `scripts/deploy-namecheap.sh` under `
 The workflow uploads the Linux standalone bundle to `/home/konobbue/mojassam-releases/<commit>`, smoke-tests it, switches the `current` symlink, and restarts Passenger. `/api/health` verifies the deployed commit and database availability; failure restores the previous startup target. Customer data stays in `/home/konobbue/mojassam-data`. Previous release directories are retained for recovery; remove older ones manually when disk space requires it.
 
 `vercel.json` disables automatic Vercel deployments. GitHub pushes do not deploy to Vercel.
+
+The previous `mojassam3d.muhammadessam.me` host permanently redirects to the matching path on the new domain, preserving query strings. Keep its DNS and redirect for existing links and search engines.

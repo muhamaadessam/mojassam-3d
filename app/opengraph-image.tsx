@@ -70,7 +70,7 @@ export default async function OpenGraphImage() {
 
         <div style={{ position: 'absolute', left: 72, right: 64, bottom: 22, display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 500, color: C.muted }}>
           <span>Files stay on your device</span>
-          <span>mojassam3d.muhammadessam.me</span>
+          <span>etba3-bas.muhammadessam.me</span>
         </div>
       </div>
     ),

@@ -9,7 +9,7 @@ app=/home/konobbue/mojassam-app
 node=/opt/alt/alt-nodejs24/root/usr/bin/node
 release="$releases/$sha"
 archive="$releases/$sha.tar.gz"
-origin=https://mojassam3d.muhammadessam.me
+origin=https://etba3-bas.muhammadessam.me
 
 # Serialize deployments even when someone starts one outside GitHub Actions.
 exec 9>"$releases/.deploy.lock"
