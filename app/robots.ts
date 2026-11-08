@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { SITE_URL } from '@/lib/site';
 
-const PRIVATE = ['/api/', '/account', '/login'];
+const PRIVATE = ['/api/', '/orders', '/admin', '/login'];
 // AI search / answer engines are explicitly welcome (GEO / AEO).
 const AI_BOTS = ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User', 'PerplexityBot', 'Perplexity-User', 'Google-Extended', 'Applebot-Extended', 'Bingbot', 'CCBot'];
 

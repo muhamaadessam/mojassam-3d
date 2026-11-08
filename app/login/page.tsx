@@ -27,7 +27,7 @@ export default function LoginPage() {
       await authRequest({ action: mode, email, password, firstName, lastName });
       // Only same-site paths, so a crafted link cannot send the customer to another site.
       const next = new URLSearchParams(window.location.search).get('next');
-      router.replace(next && /^\/(?![/\\])/.test(next) ? next : '/account');
+      router.replace(next && /^\/(?![/\\])/.test(next) ? next : '/');
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : text.genericError);

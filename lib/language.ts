@@ -12,7 +12,7 @@ function readStoredLanguage(): LanguageKey {
 
 /**
  * The chosen language, remembered in a cookie so every page (including server-rendered
- * ones like /account) opens in it.
+ * ones like /orders) opens in it.
  */
 export function useLanguage(initial?: LanguageKey) {
   const [language, setLanguageState] = useState<LanguageKey>(initial ?? 'ar');
