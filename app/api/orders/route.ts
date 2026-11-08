@@ -11,7 +11,7 @@ export async function GET() {
   return NextResponse.json({ orders: listOrders(user.id) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
-/** Ready designs post JSON. Uploaded models post multipart: an `order` JSON field, the `model` file, and optional `images`. */
+/** Ready designs post JSON. Uploaded models post multipart: an `order` JSON field, the `model` file, and optional `images`, and an optional `preview` picture of the model. */
 async function readOrder(request: Request) {
   if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) return { body: await readBody(request), files: undefined };
   const form = await readForm(request, MAX_ORDER_BODY);
@@ -20,7 +20,8 @@ async function readOrder(request: Request) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Invalid order');
   const model = form.get('model');
   const images = form.getAll('images').filter((item): item is File => item instanceof File);
-  return { body: body as Record<string, unknown>, files: await prepareOrderFiles(model instanceof File ? model : null, images) };
+  const preview = form.get('preview');
+  return { body: body as Record<string, unknown>, files: await prepareOrderFiles(model instanceof File ? model : null, images, preview instanceof File ? preview : null) };
 }
 
 export async function POST(request: Request) {

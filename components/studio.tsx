@@ -3,9 +3,6 @@
 import { ChangeEvent, DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { STLLoader } from 'three/addons/loaders/STLLoader.js';
-import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
-import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import SiteHeader from './site-header';
 import { ShieldIcon, UploadIcon } from './icons';
 import { estimateCustomPrint, MAX_ORDER_IMAGES, orderTotal, publicCatalog, type Pricing, type PrintColor } from '@/lib/catalog';
@@ -15,6 +12,7 @@ import { COPY, type FileErrorKey } from '@/lib/copy';
 import { formatBytes, formatNumber, getFormat, validateModelFile, type SupportedFormat } from '@/lib/model-file';
 import { clearPendingFile, readPendingFile } from '@/lib/pending-file';
 import { useLanguage } from '@/lib/language';
+import { applyModelStyle, disposeObject, parseModel, placeOnFloor, renderModelPreview } from '@/lib/model-preview';
 
 type ViewerState = 'idle' | 'loading' | 'ready' | 'error';
 type UnitKey = 'mm' | 'cm' | 'in';
@@ -33,38 +31,6 @@ const UNIT_FACTORS: Record<UnitKey, number> = { mm: 1, cm: 0.1, in: 1 / 25.4 };
 function getThemeColor(token: string) {
   if (typeof document === 'undefined') return '#ffffff';
   return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || '#ffffff';
-}
-
-async function parseModel(file: File, format: SupportedFormat) {
-  const data = await file.arrayBuffer();
-  if (format === 'stl') {
-    const geometry = new STLLoader().parse(data);
-    geometry.computeVertexNormals();
-    return new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ roughness: 0.68, metalness: 0.05 }));
-  }
-  if (format === 'obj') return new OBJLoader().parse(new TextDecoder().decode(data));
-  return new ThreeMFLoader().parse(data);
-}
-
-function disposeObject(object: THREE.Object3D) {
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (mesh.geometry) mesh.geometry.dispose();
-    if (Array.isArray(mesh.material)) mesh.material.forEach((material) => material.dispose());
-    else if (mesh.material) mesh.material.dispose();
-  });
-}
-
-function applyModelStyle(object: THREE.Object3D, color: string) {
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    materials.filter(Boolean).forEach((material) => {
-      const modelMaterial = material as THREE.MeshStandardMaterial;
-      if (modelMaterial.color) modelMaterial.color.set(color);
-      modelMaterial.needsUpdate = true;
-    });
-  });
 }
 
 function calculateVolumeAndTriangles(object: THREE.Object3D) {
@@ -254,14 +220,8 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
     setEstimateRequested(false);
     setOrderState('idle');
     try {
-      const model = await parseModel(file, format);
-      // Printing files are typically Z-up; the viewer uses Y as its vertical axis.
-      model.rotation.x = -Math.PI / 2;
-      const box = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.x -= center.x;
-      model.position.z -= center.z;
-      model.position.y -= box.min.y;
+      const model = await parseModel(await file.arrayBuffer(), format);
+      const box = placeOnFloor(model);
       const dimensionsMm = box.getSize(new THREE.Vector3());
       const { volumeMm3, triangleCount } = calculateVolumeAndTriangles(model);
 
@@ -321,6 +281,9 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
       form.set('order', JSON.stringify({ kind: 'custom', material: selectedMaterial.id, infill, colorId: printColor.id, volumeMm3: metadata.volumeMm3, dimensionsMm: { x, y, z }, ...extras }));
       form.set('model', model, model.name);
       photos.forEach((photo) => form.append('images', photo.file, photo.file.name));
+      // A picture of the model, so the order list shows what was ordered without opening the file.
+      const preview = await renderModelPreview(model, model.name, printColor.hex).catch(() => null);
+      if (preview) form.set('preview', preview, preview.name);
       const response = await fetch('/api/orders', { method: 'POST', body: form });
       setOrderState(response.status === 401 ? 'login' : response.ok ? 'saved' : response.status === 409 ? 'paused' : 'failed');
     } catch {

@@ -31,11 +31,12 @@ assert.equal((await request('/api/orders', { kind: 'ready', designId: 'phone-sta
 // Custom files: the model (and optional WebP photos) are uploaded with the order and priced on the server.
 const stl = new Blob(['solid part\nendsolid part\n'], { type: 'model/stl' });
 const webp = new Blob([Uint8Array.from([...Buffer.from('RIFF'), 30, 0, 0, 0, ...Buffer.from('WEBPVP8L'), 1, 0, 0, 0, 0x2f, 0, 0, 0, 0])], { type: 'image/webp' });
-async function upload(order, cookie, { model = stl, modelName = 'part.stl', images = [] } = {}) {
+async function upload(order, cookie, { model = stl, modelName = 'part.stl', images = [], preview = null } = {}) {
   const form = new FormData();
   form.set('order', JSON.stringify(order));
   if (model) form.set('model', model, modelName);
   for (const image of images) form.append('images', image, 'photo.webp');
+  if (preview) form.set('preview', preview, 'preview.webp');
   const response = await fetch(`${origin}/api/orders`, { method: 'POST', headers: { Origin: origin, Cookie: cookie }, body: form });
   return { status: response.status, body: await response.json() };
 }
@@ -51,6 +52,13 @@ assert.equal(modelDownload.status, 200);
 assert.equal(await modelDownload.text(), 'solid part\nendsolid part\n');
 assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[1]), { headers: { Cookie: first.cookie } })).headers.get('content-type'), 'image/webp');
 assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]))).status, 401);
+// The browser sends a picture of the model; it is stored as its own file and served as an image.
+const withPreview = await upload(customOrder, first.cookie, { preview: webp });
+assert.equal(withPreview.status, 201);
+const previewFile = withPreview.body.order.files.find((file) => file.kind === 'preview');
+assert.ok(previewFile);
+assert.equal((await fetch(fileUrl(withPreview.body.order, previewFile), { headers: { Cookie: first.cookie } })).headers.get('content-type'), 'image/webp');
+assert.equal((await upload(customOrder, first.cookie, { preview: new Blob(['not an image']) })).status, 400);
 // A custom order needs its file, photos must be WebP, and only 3D formats are accepted.
 assert.equal((await request('/api/orders', { ...customOrder }, first.cookie)).status, 409);
 assert.equal((await upload(customOrder, first.cookie, { model: null })).status, 409);
@@ -64,7 +72,7 @@ assert.equal(second.status, 200);
 assert.equal((await request('/api/orders', undefined, second.cookie)).body.orders.length, 0);
 // Another customer cannot read someone else's attachments.
 assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]), { headers: { Cookie: second.cookie } })).status, 404);
-assert.equal((await request('/api/orders', undefined, first.cookie)).body.orders.length, 2);
+assert.equal((await request('/api/orders', undefined, first.cookie)).body.orders.length, 3);
 assert.equal((await request('/api/auth', { action: 'profile', first_name: 'Changed', last_name: 'One', avatar_url: '' }, first.cookie)).body.user.first_name, 'Changed');
 assert.equal((await request('/api/auth', { action: 'profile', first_name: 'Bad', last_name: 'Avatar', avatar_url: 'javascript:alert(1)' }, first.cookie)).status, 400);
 await request('/api/auth', { action: 'logout' }, first.cookie);
@@ -72,7 +80,7 @@ assert.equal((await request('/api/orders', undefined, first.cookie)).status, 401
 assert.equal((await request('/api/auth', { action: 'login', email: `a-${suffix}@example.test`, password: 'incorrect-password' })).status, 400);
 const loggedIn = await request('/api/auth', { action: 'login', email: `a-${suffix}@example.test`, password });
 assert.equal(loggedIn.status, 200);
-assert.equal((await request('/api/orders', undefined, loggedIn.cookie)).body.orders.length, 2);
+assert.equal((await request('/api/orders', undefined, loggedIn.cookie)).body.orders.length, 3);
 
 // Quantity and contact details are stored; the total is still computed on the server.
 const multi = await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue', quantity: 3, phone: '01012345678', note: 'pickup Friday' }, loggedIn.cookie);

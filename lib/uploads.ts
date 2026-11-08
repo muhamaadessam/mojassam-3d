@@ -10,7 +10,8 @@ export { MAX_DESIGN_IMAGES, MAX_IMAGE_BYTES };
 /** Largest multipart body accepted for an order: the model, its photos, and the form fields. */
 export const MAX_ORDER_BODY = MAX_FILE_SIZE + MAX_ORDER_IMAGES * MAX_IMAGE_BYTES + 1024 * 1024;
 
-export type OrderFile = { id: string; kind: 'model' | 'image'; name: string; size: number };
+/** `preview` is a picture of the model drawn in the customer's browser; `image` is a reference photo. */
+export type OrderFile = { id: string; kind: 'model' | 'image' | 'preview'; name: string; size: number };
 
 export class UploadError extends Error {}
 
@@ -36,7 +37,7 @@ async function readImage(file: File) {
 const cleanName = (name: string) => name.replace(/[\\/\0-\x1f]/g, '_').trim().slice(0, 160) || 'file';
 
 /** Checks the customer's attachments before an order is created, so a bad file never leaves a half-saved order. */
-export async function prepareOrderFiles(model: File | null, images: File[]) {
+export async function prepareOrderFiles(model: File | null, images: File[], preview: File | null = null) {
   if (images.length > MAX_ORDER_IMAGES) throw new UploadError(`الحد الأقصى ${MAX_ORDER_IMAGES} صور.`);
   let modelFile: { name: string; ext: string; bytes: Uint8Array } | null = null;
   if (model) {
@@ -46,7 +47,8 @@ export async function prepareOrderFiles(model: File | null, images: File[]) {
     modelFile = { name: cleanName(model.name), ext, bytes: new Uint8Array(await model.arrayBuffer()) };
   }
   const imageFiles = await Promise.all(images.map(async (image) => ({ name: cleanName(image.name), bytes: await readImage(image) })));
-  return { model: modelFile, images: imageFiles };
+  const previewBytes = preview && modelFile ? await readImage(preview) : null;
+  return { model: modelFile, images: imageFiles, preview: previewBytes };
 }
 export type PreparedOrderFiles = Awaited<ReturnType<typeof prepareOrderFiles>>;
 
@@ -54,6 +56,7 @@ export async function saveOrderFiles(orderId: string, files: PreparedOrderFiles)
   const entries = [
     ...(files.model ? [{ kind: 'model', name: files.model.name, ext: files.model.ext, bytes: files.model.bytes }] : []),
     ...files.images.map((image) => ({ kind: 'image', name: image.name, ext: 'webp', bytes: image.bytes })),
+    ...(files.preview ? [{ kind: 'preview', name: 'preview.webp', ext: 'webp', bytes: files.preview }] : []),
   ];
   if (!entries.length) return;
   const dir = orderDir(orderId);
@@ -95,7 +98,7 @@ export async function orderFileResponse(orderId: string, fileId: string, viewer:
   const path = resolve(orderDir(orderId), row.stored);
   const info = await stat(path).catch(() => null);
   if (!info) return null;
-  const image = row.kind === 'image';
+  const image = row.kind !== 'model';
   return streamFile(path, info.size, {
     'Content-Type': image ? 'image/webp' : 'application/octet-stream',
     'Content-Disposition': `${image ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(row.name)}`,
