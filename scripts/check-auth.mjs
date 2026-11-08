@@ -91,6 +91,31 @@ assert.equal(multi.body.order.phone, '01012345678');
 assert.equal((await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue', quantity: 0 }, loggedIn.cookie)).status, 400);
 assert.equal((await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue', phone: '<script>' }, loggedIn.cookie)).status, 400);
 
+// While an order is pending its owner can change it (the total follows the quantity) or delete it.
+async function change(method, id, body, cookie) {
+  const response = await fetch(`${origin}/api/orders/${id}`, { method, headers: { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  return { status: response.status, body: await response.json().catch(() => ({})) };
+}
+const edited = await change('PATCH', multi.body.order.id, { quantity: 2, colorId: 'black', note: 'pickup Saturday' }, loggedIn.cookie);
+assert.equal(edited.status, 200);
+assert.equal(edited.body.order.quantity, 2);
+assert.equal(edited.body.order.color, 'black');
+assert.equal(edited.body.order.customer_note, 'pickup Saturday');
+assert.equal(edited.body.order.estimated_price, (54 * 6 + 1.75 * 15) * 2);
+assert.equal(edited.body.order.estimated_hours, 1.75 * 2);
+assert.equal((await change('PATCH', multi.body.order.id, { quantity: 0 }, loggedIn.cookie)).status, 400);
+assert.equal((await change('PATCH', multi.body.order.id, { colorId: 'gold' }, loggedIn.cookie)).status, 400);
+assert.equal((await change('PATCH', multi.body.order.id, { quantity: 1 }, second.cookie)).status, 404);
+assert.equal((await change('DELETE', multi.body.order.id, undefined, second.cookie)).status, 404);
+const crossSite = await fetch(`${origin}/api/orders/${multi.body.order.id}`, { method: 'DELETE', headers: { Origin: 'https://evil.example', Cookie: loggedIn.cookie } });
+assert.equal(crossSite.status, 403);
+assert.equal((await change('DELETE', multi.body.order.id, undefined, loggedIn.cookie)).status, 200);
+assert.equal((await change('PATCH', multi.body.order.id, { quantity: 1 }, loggedIn.cookie)).status, 404);
+// Deleting a custom order also removes its files.
+const doomed = await upload(customOrder, loggedIn.cookie);
+assert.equal((await change('DELETE', doomed.body.order.id, undefined, loggedIn.cookie)).status, 200);
+assert.equal((await fetch(fileUrl(doomed.body.order, doomed.body.order.files[0]), { headers: { Cookie: loggedIn.cookie } })).status, 404);
+
 // Customers cannot reach the admin dashboard API.
 assert.equal((await request('/api/admin/orders', undefined, loggedIn.cookie)).status, 403);
 assert.equal((await request('/api/admin/settings', { machineHourlyRate: 0 }, loggedIn.cookie)).status, 403);
@@ -147,6 +172,9 @@ if (adminEmail) {
   assert.equal(mine.final_price, 400);
   assert.equal(mine.admin_note, 'Ready Sunday');
   assert.equal((await request('/api/admin/orders', { id: repriced.body.order.id, status: 'shipped-to-mars' }, admin.cookie)).status, 400);
+  // Once the shop has started, the customer can no longer change or delete the order.
+  assert.equal((await change('PATCH', repriced.body.order.id, { quantity: 2 }, loggedIn.cookie)).status, 409);
+  assert.equal((await change('DELETE', repriced.body.order.id, undefined, loggedIn.cookie)).status, 409);
   assert.equal((await request('/api/admin/orders', { action: 'delete', id: repriced.body.order.id }, admin.cookie)).status, 200);
   console.log('Passed: admin settings validation, live repricing, pausing orders, and order updates.');
 } else {

@@ -3,14 +3,15 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/auth';
-import { anyColor, anyDesign } from '@/lib/catalog';
+import { anyColor, anyDesign, publicCatalog } from '@/lib/catalog';
 import { getPricing } from '@/lib/settings';
 import { ACCOUNT_COPY, ORDER_STATUS } from '@/lib/copy';
 import { LANGUAGE_COOKIE, type LanguageKey } from '@/lib/language-config';
-import { listOrders } from '@/lib/orders';
+import { EDITABLE_STATUS, listOrders, unitCost } from '@/lib/orders';
 import { formatDate, formatNumber } from '@/lib/model-file';
 import OrdersHeader from '@/components/account/orders-header';
 import OrderThumb from '@/components/order-thumb';
+import OrderActions from '@/components/account/order-actions';
 
 export const metadata: Metadata = { title: 'طلباتي', robots: { index: false, follow: false } };
 
@@ -22,6 +23,7 @@ export default async function OrdersPage() {
   const orders = listOrders(user.id);
   const pricing = getPricing();
   const currency = language === 'ar' ? 'ج.م' : 'EGP';
+  const { colors } = publicCatalog(pricing);
 
   return (
     <main className="app-shell orders-shell">
@@ -46,7 +48,7 @@ export default async function OrdersPage() {
               <OrderThumb orderId={order.id} files={order.files} color={color?.hex} image={design?.images[0]} label={name} linked />
               <div className="order-card-info"><span className={`order-status status-${order.status}`}>{ORDER_STATUS[language][order.status] ?? order.status}</span><h2>{name}{order.quantity > 1 ? ` × ${order.quantity}` : ''}</h2><p>{order.material} · {colorName} · {text.infill} {order.infill}%</p>{order.admin_note && <p className="order-admin-note"><b>{text.shopNote}:</b> {order.admin_note}</p>}{order.files.some((file) => file.kind !== 'preview') && <div className="order-file-photos">{order.files.filter((file) => file.kind !== 'preview').map((file) => (file.kind === 'image'
                 ? <a key={file.id} href={`/api/orders/${order.id}/files/${file.id}`} target="_blank" rel="noreferrer"><img src={`/api/orders/${order.id}/files/${file.id}`} alt="" loading="lazy" /></a>
-                : <a key={file.id} className="order-file-chip" href={`/api/orders/${order.id}/files/${file.id}`} download={file.name} dir="ltr">{file.name}</a>))}</div>}</div>
+                : <a key={file.id} className="order-file-chip" href={`/api/orders/${order.id}/files/${file.id}`} download={file.name} dir="ltr">{file.name}</a>))}</div>}{order.status === EDITABLE_STATUS && <OrderActions language={language} colors={colors} order={{ id: order.id, name, color: order.color, quantity: order.quantity, phone: order.phone, note: order.customer_note }} price={{ unit: unitCost(order, pricing).unitPrice, setupFee: pricing.setupFee, minimum: pricing.minimumPrice }} />}</div>
               <div className="order-metrics">{order.final_price != null ? <><strong>{`${formatNumber(order.final_price, 2)} ${currency}`}</strong><small>{text.finalPrice}</small></> : <><strong>{order.estimated_price ? `${formatNumber(order.estimated_price, 2)} ${currency}` : '—'}</strong><small>{text.estimatedPrice}</small></>}<span>{order.estimated_hours ? `${formatNumber(order.estimated_hours, 2)} ${language === 'ar' ? 'ساعة' : 'h'}` : '—'}</span><small><bdi>{formatDate(order.created_at, language)}</bdi></small></div>
             </article>
           );
