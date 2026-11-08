@@ -16,7 +16,8 @@ export type ReadyDesign = {
   weightGrams: number;
   printHours: number;
   artClass: string;
-  image?: string;
+  /** Product photos, first one is the cover. */
+  images: string[];
   enabled: boolean;
 };
 export type Pricing = {
@@ -40,6 +41,12 @@ export type Dimensions = { x: number; y: number; z: number };
 
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const MAX_QUANTITY = 50;
+/** Images arrive already shrunk and re-encoded as WebP by the browser; this is a safety cap. */
+export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+/** Reference photos a customer can attach to one order. */
+export const MAX_ORDER_IMAGES = 8;
+/** Product photos per ready design. */
+export const MAX_DESIGN_IMAGES = 12;
 
 export const DEFAULT_PRICING: Pricing = {
   machineHourlyRate: 15,
@@ -61,9 +68,9 @@ export const DEFAULT_PRICING: Pricing = {
     { id: 'pink', ar: 'وردي', en: 'Pink', hex: '#ef8fb5', enabled: true },
   ],
   designs: [
-    { id: 'desk-organizer', nameAr: 'منظّم مكتب', nameEn: 'Desk organizer', descriptionAr: 'خانات عملية للأقلام والكروت.', descriptionEn: 'Practical slots for pens and cards.', categoryAr: 'مكتب', categoryEn: 'Desk', material: 'pla', infill: 20, weightGrams: 72, printHours: 2.5, artClass: 'organizer', enabled: true },
-    { id: 'wave-vase', nameAr: 'مزهرية الموجة', nameEn: 'Wave vase', descriptionAr: 'شكل هادئ يضيف لمسة للمكان.', descriptionEn: 'A calm form that adds character to a room.', categoryAr: 'ديكور', categoryEn: 'Decor', material: 'petg', infill: 15, weightGrams: 118, printHours: 4, artClass: 'vase', enabled: true },
-    { id: 'phone-stand', nameAr: 'حامل موبايل', nameEn: 'Phone stand', descriptionAr: 'حامل ثابت للمكتب أو بجانب السرير.', descriptionEn: 'A stable stand for your desk or bedside.', categoryAr: 'إكسسوارات', categoryEn: 'Accessories', material: 'pla', infill: 25, weightGrams: 54, printHours: 1.75, artClass: 'stand', enabled: true },
+    { id: 'desk-organizer', nameAr: 'منظّم مكتب', nameEn: 'Desk organizer', descriptionAr: 'خانات عملية للأقلام والكروت.', descriptionEn: 'Practical slots for pens and cards.', categoryAr: 'مكتب', categoryEn: 'Desk', material: 'pla', infill: 20, weightGrams: 72, printHours: 2.5, artClass: 'organizer', images: [], enabled: true },
+    { id: 'wave-vase', nameAr: 'مزهرية الموجة', nameEn: 'Wave vase', descriptionAr: 'شكل هادئ يضيف لمسة للمكان.', descriptionEn: 'A calm form that adds character to a room.', categoryAr: 'ديكور', categoryEn: 'Decor', material: 'petg', infill: 15, weightGrams: 118, printHours: 4, artClass: 'vase', images: [], enabled: true },
+    { id: 'phone-stand', nameAr: 'حامل موبايل', nameEn: 'Phone stand', descriptionAr: 'حامل ثابت للمكتب أو بجانب السرير.', descriptionEn: 'A stable stand for your desk or bedside.', categoryAr: 'إكسسوارات', categoryEn: 'Accessories', material: 'pla', infill: 25, weightGrams: 54, printHours: 1.75, artClass: 'stand', images: [], enabled: true },
   ],
 };
 

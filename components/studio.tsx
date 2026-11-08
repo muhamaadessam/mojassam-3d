@@ -8,8 +8,9 @@ import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import SiteHeader from './site-header';
 import { ShieldIcon, UploadIcon } from './icons';
-import { estimateCustomPrint, orderTotal, publicCatalog, type Pricing, type PrintColor } from '@/lib/catalog';
+import { estimateCustomPrint, MAX_ORDER_IMAGES, orderTotal, publicCatalog, type Pricing, type PrintColor } from '@/lib/catalog';
 import OrderExtras, { EMPTY_EXTRAS } from './order-extras';
+import ImagePicker, { type PickedImage } from './image-picker';
 import { COPY, type FileErrorKey } from '@/lib/copy';
 import { formatBytes, formatNumber, getFormat, validateModelFile, type SupportedFormat } from '@/lib/model-file';
 import { clearPendingFile, readPendingFile } from '@/lib/pending-file';
@@ -131,6 +132,9 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
   const [autoRotate, setAutoRotate] = useState(false);
   const [estimateRequested, setEstimateRequested] = useState(false);
   const [orderState, setOrderState] = useState<OrderState>('idle');
+  const [photos, setPhotos] = useState<PickedImage[]>([]);
+  /** The model being previewed; it is uploaded with the order. */
+  const modelFileRef = useRef<File | null>(null);
   const text = COPY[language];
 
   useEffect(() => {
@@ -266,6 +270,7 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
         disposeObject(modelRef.current);
       }
       modelRef.current = model;
+      modelFileRef.current = file;
       sceneRef.current?.add(model);
       applyModelStyle(model, printColorRef.current);
       setMetadata({ fileName: file.name, fileSize: file.size, format, dimensionsMm, volumeMm3, triangleCount });
@@ -307,21 +312,22 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
   const money = (value: number) => `${formatNumber(value)} ${text.currency}`;
 
   const orderFile = async () => {
-    if (!metadata?.volumeMm3) return;
+    const model = modelFileRef.current;
+    if (!metadata?.volumeMm3 || !model) return;
     setOrderState('saving');
     try {
       const { x, y, z } = metadata.dimensionsMm;
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'custom', fileName: metadata.fileName, material: selectedMaterial.id, infill, colorId: printColor.id, volumeMm3: metadata.volumeMm3, dimensionsMm: { x, y, z }, ...extras }),
-      });
+      const form = new FormData();
+      form.set('order', JSON.stringify({ kind: 'custom', material: selectedMaterial.id, infill, colorId: printColor.id, volumeMm3: metadata.volumeMm3, dimensionsMm: { x, y, z }, ...extras }));
+      form.set('model', model, model.name);
+      photos.forEach((photo) => form.append('images', photo.file, photo.file.name));
+      const response = await fetch('/api/orders', { method: 'POST', body: form });
       setOrderState(response.status === 401 ? 'login' : response.ok ? 'saved' : response.status === 409 ? 'paused' : 'failed');
     } catch {
       setOrderState('failed');
     }
   };
-  const orderMessage = { idle: '', saving: text.orderSaving, saved: text.orderConfirmed, login: text.loginRequired, failed: text.orderFailed, paused: pricing.notice || text.ordersPaused }[orderState];
+  const orderMessage = { idle: '', saving: text.orderUploading, saved: text.orderConfirmed, login: text.loginRequired, failed: text.orderFailed, paused: pricing.notice || text.ordersPaused }[orderState];
 
   return (
     <main className="app-shell">
@@ -453,6 +459,7 @@ export default function StudioPage({ pricing }: { pricing: Pricing }) {
                   <div className="estimate-action">
                     {(pricing.setupFee > 0 || pricing.minimumPrice > 0) && <p>{[pricing.setupFee > 0 && text.setupFee(formatNumber(pricing.setupFee, 0)), pricing.minimumPrice > 0 && text.minimumPrice(formatNumber(pricing.minimumPrice, 0))].filter(Boolean).join(' · ')}</p>}
                     <OrderExtras text={text} value={extras} onChange={setExtras} />
+                    <ImagePicker images={photos} onChange={setPhotos} max={MAX_ORDER_IMAGES} label={text.refPhotos} hint={text.refPhotosHint} text={text.imageText} />
                     <p>{text.orderFileNote}</p>
                     <button className="primary-button estimate-button" disabled={!pricing.acceptingOrders || orderState === 'saving' || orderState === 'saved'} onClick={orderFile}>{orderState === 'saving' ? text.orderSaving : text.orderThisFile}</button>
                     {orderMessage && <p role="status" className="studio-order-message">{orderMessage}</p>}

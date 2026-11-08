@@ -28,16 +28,42 @@ assert.equal(ready.body.order.infill, 25);
 assert.equal(ready.body.order.color, 'blue');
 assert.equal((await request('/api/orders', { kind: 'ready', designId: 'nope', colorId: 'blue' }, first.cookie)).status, 400);
 assert.equal((await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'gold' }, first.cookie)).status, 400);
-// Custom files: priced on the server from measurements, which must be realistic.
-const custom = await request('/api/orders', { kind: 'custom', fileName: 'part.stl', material: 'petg', infill: 20, colorId: 'black', volumeMm3: 10000, dimensionsMm: { x: 20, y: 20, z: 25 }, estimatedPrice: 1 }, first.cookie);
+// Custom files: the model (and optional WebP photos) are uploaded with the order and priced on the server.
+const stl = new Blob(['solid part\nendsolid part\n'], { type: 'model/stl' });
+const webp = new Blob([Uint8Array.from([...Buffer.from('RIFF'), 30, 0, 0, 0, ...Buffer.from('WEBPVP8L'), 1, 0, 0, 0, 0x2f, 0, 0, 0, 0])], { type: 'image/webp' });
+async function upload(order, cookie, { model = stl, modelName = 'part.stl', images = [] } = {}) {
+  const form = new FormData();
+  form.set('order', JSON.stringify(order));
+  if (model) form.set('model', model, modelName);
+  for (const image of images) form.append('images', image, 'photo.webp');
+  const response = await fetch(`${origin}/api/orders`, { method: 'POST', headers: { Origin: origin, Cookie: cookie }, body: form });
+  return { status: response.status, body: await response.json() };
+}
+const customOrder = { kind: 'custom', material: 'petg', infill: 20, colorId: 'black', volumeMm3: 10000, dimensionsMm: { x: 20, y: 20, z: 25 }, estimatedPrice: 1 };
+const custom = await upload(customOrder, first.cookie, { images: [webp] });
 assert.equal(custom.status, 201);
 assert.ok(custom.body.order.estimated_price > 1);
-assert.equal((await request('/api/orders', { kind: 'custom', material: 'pla', infill: 20, colorId: 'black', volumeMm3: -5, dimensionsMm: { x: 1, y: 1, z: 1 } }, first.cookie)).status, 400);
-assert.equal((await request('/api/orders', { kind: 'custom', material: 'gold', infill: 20, colorId: 'black', volumeMm3: 5, dimensionsMm: { x: 1, y: 1, z: 1 } }, first.cookie)).status, 400);
+assert.equal(custom.body.order.design_name, 'part.stl');
+assert.deepEqual(custom.body.order.files.map((file) => file.kind), ['model', 'image']);
+const fileUrl = (order, file) => `${origin}/api/orders/${order.id}/files/${file.id}`;
+const modelDownload = await fetch(fileUrl(custom.body.order, custom.body.order.files[0]), { headers: { Cookie: first.cookie } });
+assert.equal(modelDownload.status, 200);
+assert.equal(await modelDownload.text(), 'solid part\nendsolid part\n');
+assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[1]), { headers: { Cookie: first.cookie } })).headers.get('content-type'), 'image/webp');
+assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]))).status, 401);
+// A custom order needs its file, photos must be WebP, and only 3D formats are accepted.
+assert.equal((await request('/api/orders', { ...customOrder }, first.cookie)).status, 409);
+assert.equal((await upload(customOrder, first.cookie, { model: null })).status, 409);
+assert.equal((await upload(customOrder, first.cookie, { images: [new Blob(['not an image'])] })).status, 400);
+assert.equal((await upload(customOrder, first.cookie, { modelName: 'part.exe' })).status, 400);
+assert.equal((await upload({ ...customOrder, volumeMm3: -5 }, first.cookie)).status, 400);
+assert.equal((await upload({ ...customOrder, material: 'gold' }, first.cookie)).status, 400);
 
 const second = await request('/api/auth', { action: 'signup', email: `b-${suffix}@example.test`, password, firstName: 'Test', lastName: 'Two' });
 assert.equal(second.status, 200);
 assert.equal((await request('/api/orders', undefined, second.cookie)).body.orders.length, 0);
+// Another customer cannot read someone else's attachments.
+assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]), { headers: { Cookie: second.cookie } })).status, 404);
 assert.equal((await request('/api/orders', undefined, first.cookie)).body.orders.length, 2);
 assert.equal((await request('/api/auth', { action: 'profile', first_name: 'Changed', last_name: 'One', avatar_url: '' }, first.cookie)).body.user.first_name, 'Changed');
 assert.equal((await request('/api/auth', { action: 'profile', first_name: 'Bad', last_name: 'Avatar', avatar_url: 'javascript:alert(1)' }, first.cookie)).status, 400);
@@ -81,6 +107,20 @@ if (adminEmail) {
   assert.equal((await request('/api/admin/settings', changed, admin.cookie)).status, 200);
   const repriced = await request('/api/orders', { kind: 'ready', designId: 'phone-stand', colorId: 'blue' }, loggedIn.cookie);
   assert.equal(repriced.body.order.estimated_price, 54 * 7 + 1.75 * 20 + 10);
+
+  // Product photos: admins upload WebP images, which are then public.
+  const photoForm = new FormData();
+  photoForm.append('images', webp, 'photo.webp');
+  const photos = await fetch(`${origin}/api/admin/uploads`, { method: 'POST', headers: { Origin: origin, Cookie: admin.cookie }, body: photoForm });
+  assert.equal(photos.status, 200);
+  const [photoUrl] = (await photos.json()).urls;
+  assert.equal((await fetch(`${origin}${photoUrl}`)).headers.get('content-type'), 'image/webp');
+  assert.equal((await fetch(`${origin}/api/admin/uploads`, { method: 'POST', headers: { Origin: origin, Cookie: loggedIn.cookie }, body: photoForm })).status, 403);
+  const withPhotos = { ...original, designs: original.designs.map((design, index) => (index === 0 ? { ...design, images: [photoUrl] } : design)) };
+  assert.deepEqual((await request('/api/admin/settings', withPhotos, admin.cookie)).body.pricing.designs[0].images, [photoUrl]);
+  assert.equal((await request('/api/admin/settings', { ...original, designs: original.designs.map((design) => ({ ...design, images: ['javascript:alert(1)'] })) }, admin.cookie)).status, 400);
+  // An admin can download any customer's file.
+  assert.equal((await fetch(fileUrl(custom.body.order, custom.body.order.files[0]), { headers: { Cookie: admin.cookie } })).status, 200);
 
   // Pausing orders refuses new ones.
   assert.equal((await request('/api/admin/settings', { ...changed, acceptingOrders: false, notice: 'Closed for Eid' }, admin.cookie)).status, 200);

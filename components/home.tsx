@@ -136,7 +136,14 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
         <div className="store-grid">
           {designs.map((design) => (
             <article className="store-card" key={design.id}>
-              {design.image ? <img className="product-image" src={design.image} alt={name(design)} /> : <div className={`product-art ${design.artClass}`} aria-hidden="true"><span /></div>}
+              {design.images.length ? (
+                <div className="product-gallery-wrap">
+                  <div className="product-gallery" tabIndex={design.images.length > 1 ? 0 : undefined} aria-label={name(design)}>
+                    {design.images.map((src, index) => <img key={src} className="product-image" src={src} alt={index === 0 ? name(design) : ''} loading="lazy" decoding="async" />)}
+                  </div>
+                  {design.images.length > 1 && <span className="product-gallery-count" dir="ltr">{design.images.length} ◂▸</span>}
+                </div>
+              ) : <div className={`product-art ${design.artClass}`} aria-hidden="true"><span /></div>}
               <div className="store-card-body">
                 <div className="store-card-meta"><span>{language === 'ar' ? design.categoryAr : design.categoryEn}</span><span>{text.readyOrderTag}</span></div>
                 <h3>{name(design)}</h3>
