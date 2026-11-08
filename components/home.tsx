@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SiteHeader from '@/components/site-header';
 import { CheckIcon, ShieldIcon, UploadIcon } from '@/components/icons';
@@ -19,6 +20,7 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
   const FAQ = getFaq(pricing);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const { language, toggleLanguage } = useLanguage();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<FileErrorKey | null>(null);
@@ -51,9 +53,10 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
   };
 
   const requestReadyDesign = (design: ReadyDesign) => {
+    if (orderDesign?.id !== design.id) setExtras(EMPTY_EXTRAS);
     setOrderDesign(design);
-    setOrderState('added');
-    requestAnimationFrame(() => document.getElementById('order-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    setOrderState('idle');
+    dialogRef.current?.showModal();
   };
 
   const confirmReadyOrder = async () => {
@@ -72,7 +75,7 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
     }
   };
 
-  const orderNotice = { idle: '', added: text.orderAdded, saving: text.orderSaving, saved: text.orderConfirmed, login: text.loginRequired, failed: text.orderFailed, paused: pricing.notice || text.ordersPaused }[orderState];
+  const orderNotice = { idle: '', added: '', saving: '', saved: text.orderConfirmed, login: text.loginRequired, failed: text.orderFailed, paused: pricing.notice || text.ordersPaused }[orderState];
   const unitPrice = (design: ReadyDesign) => getReadyPrice(design, pricing);
   const materialLabel = (id: string) => materials.find((material) => material.id === id)?.label ?? id;
 
@@ -84,7 +87,6 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
         language={language}
         text={text}
         onToggleLanguage={toggleLanguage}
-        onUpload={() => fileInputRef.current?.click()}
       />
 
       <section className="home-hero">
@@ -155,13 +157,25 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
             </article>
           ))}
         </div>
-        <section className="order-summary" id="order-summary" aria-live="polite">
-          <div>
-            <p className="eyebrow accent">{text.orderTitle}</p>
-            <strong>{orderDesign ? name(orderDesign) : text.orderEmpty}</strong>
-            {orderDesign && <p>{text.total}: {formatNumber(orderTotal(pricing, unitPrice(orderDesign), extras.quantity))} {text.currency} · {text.orderNote}</p>}
-            {orderDesign && (pricing.setupFee > 0 || pricing.minimumPrice > 0) && <p>{[pricing.setupFee > 0 && text.setupFee(formatNumber(pricing.setupFee, 0)), pricing.minimumPrice > 0 && text.minimumPrice(formatNumber(pricing.minimumPrice, 0))].filter(Boolean).join(' · ')}</p>}
-            {orderDesign && (
+        <dialog
+          ref={dialogRef}
+          className="order-dialog"
+          aria-labelledby="order-dialog-title"
+          onClose={() => setOrderState('idle')}
+          onClick={(event) => { if (event.target === event.currentTarget) dialogRef.current?.close(); }}
+        >
+          {orderDesign && (
+            <div className="order-dialog-body">
+              <header className={`order-dialog-head ${orderDesign.images[0] ? 'has-thumb' : ''}`}>
+                {orderDesign.images[0] && <img className="order-dialog-thumb" src={orderDesign.images[0]} alt="" />}
+                <div>
+                  <p className="eyebrow accent">{text.orderTitle}</p>
+                  <h2 id="order-dialog-title">{name(orderDesign)}</h2>
+                  <p>{materialLabel(orderDesign.material)} · {text.infill} {formatNumber(orderDesign.infill, 0)}% · {formatNumber(orderDesign.printHours, 2)} {text.hoursUnit}</p>
+                </div>
+                <button type="button" className="order-dialog-close" onClick={() => dialogRef.current?.close()} aria-label={language === 'ar' ? 'إغلاق' : 'Close'}>×</button>
+              </header>
+
               <div className="color-picker order-color-picker">
                 <span>{text.printColor}</span>
                 <div className="color-swatches" role="radiogroup" aria-label={text.printColor}>
@@ -179,12 +193,24 @@ export default function Home({ pricing, jsonLd }: { pricing: Pricing; jsonLd: st
                   ))}
                 </div>
               </div>
-            )}
-            {orderDesign && <OrderExtras text={text} value={extras} onChange={setExtras} />}
-          </div>
-          <button className="primary-button" disabled={!pricing.acceptingOrders || !orderDesign || orderState === 'saving' || orderState === 'saved'} onClick={confirmReadyOrder}>{orderState === 'saving' ? text.orderSaving : text.confirmOrder}</button>
-          {orderNotice && <span className="order-notice">{orderNotice}</span>}
-        </section>
+              <OrderExtras text={text} value={extras} onChange={setExtras} />
+
+              <footer className="order-dialog-foot">
+                <div>
+                  <span>{text.total}</span>
+                  <strong>{formatNumber(orderTotal(pricing, unitPrice(orderDesign), extras.quantity))} <small>{text.currency}</small></strong>
+                  <p>{[text.orderNote, pricing.setupFee > 0 && text.setupFee(formatNumber(pricing.setupFee, 0)), pricing.minimumPrice > 0 && text.minimumPrice(formatNumber(pricing.minimumPrice, 0))].filter(Boolean).join(' · ')}</p>
+                </div>
+                {orderState === 'login'
+                  ? <Link className="primary-button" href="/login?next=/%23store">{text.signIn}</Link>
+                  : orderState === 'saved'
+                    ? <button type="button" className="primary-button" onClick={() => dialogRef.current?.close()}>{language === 'ar' ? 'تمام' : 'Done'}</button>
+                    : <button type="button" className="primary-button" disabled={!pricing.acceptingOrders || orderState === 'saving'} onClick={confirmReadyOrder}>{orderState === 'saving' ? text.orderSaving : text.confirmOrder}</button>}
+              </footer>
+              {orderNotice && <p className={`order-dialog-notice ${orderState === 'failed' || orderState === 'paused' ? 'error' : ''}`} role="status">{orderNotice}</p>}
+            </div>
+          )}
+        </dialog>
       </section>
 
       <section className="store-section faq-section" id="faq" aria-labelledby="faq-title">

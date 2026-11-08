@@ -252,19 +252,14 @@ select:focus-visible, .auth-form input:focus-visible, .profile-form input:focus-
 .topbar-nav a[aria-current='page']::after { position: absolute; inset-inline: 12px; bottom: -15px; height: 2px; border-radius: 2px; background: var(--color-brand); content: ''; }
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; min-width: 0; margin-inline-start: auto; }
-.topbar-note { display: flex; align-items: center; gap: 8px; margin-inline-end: 8px; color: var(--color-text-subtle); font-size: 12px; white-space: nowrap; }
-.online-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--color-brand); box-shadow: 0 0 0 3px var(--color-brand-surface-strong); }
 .topbar-lang, .topbar-link { display: inline-flex; align-items: center; height: 36px; border: 1px solid transparent; border-radius: 9px; padding: 0 11px; color: var(--color-text-secondary); background: transparent; font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; transition: color .2s ease, background-color .2s ease, border-color .2s ease; }
 .topbar-lang:hover, .topbar-link:hover { color: var(--color-text-primary); background: color-mix(in srgb, var(--color-text-muted) 8%, transparent); }
 .account-link { border-color: var(--color-border-strong); }
 .account-menu { display: flex; align-items: center; gap: 9px; height: 36px; min-width: 0; border: 1px solid var(--color-border-strong); border-radius: 999px; padding-inline: 4px 12px; color: var(--color-text-heading); font-size: 13px; font-weight: 700; text-decoration: none; transition: border-color .2s ease, background-color .2s ease; }
 .account-menu:hover { border-color: var(--color-brand-border-strong); background: var(--color-brand-surface); }
 .account-menu-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.topbar-upload { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; font-size: 13px; white-space: nowrap; box-shadow: none; }
-.topbar-upload svg { flex: 0 0 auto; }
 
 /* Shed the lowest-priority items first as the bar narrows. */
-@media (max-width: 1240px) { .topbar-note { display: none; } }
 @media (max-width: 1060px) { .topbar-inner { gap: 18px; } .topbar-nav a { padding-inline: 9px; } }
 /* Narrow screens: links drop to a second row instead of disappearing. */
 @media (max-width: 900px) {
@@ -280,9 +275,7 @@ select:focus-visible, .auth-form input:focus-visible, .profile-form input:focus-
   .topbar-lang, .topbar-link { padding: 0 9px; }
   .account-menu { padding: 3px; }
   .account-menu-name { display: none; }
-  .topbar-upload { padding: 0 11px; }
 }
-@media (max-width: 370px) { .topbar-upload span { display: none; } .topbar-upload { width: 36px; justify-content: center; padding: 0; } }
 
 /* Order extras (quantity, phone, note) */
 .order-extras { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; margin-top: 14px; }
@@ -504,3 +497,28 @@ a.primary-button { display: inline-flex; align-items: center; justify-content: c
 .order-file-photos a:not(.order-file-chip) { display: block; width: 64px; height: 64px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px; }
 .order-file-photos img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .order-file-chip { align-self: center; padding: 4px 10px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-secondary); font-size: 12px; text-decoration: none; overflow-wrap: anywhere; }
+
+/* Ready-design order dialog. */
+.order-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; overflow: auto; border: 1px solid var(--color-border-strong); border-radius: var(--radius-card); background: var(--color-surface); color: var(--color-text-primary); box-shadow: var(--shadow-panel); }
+.order-dialog::backdrop { background: color-mix(in srgb, var(--color-page) 72%, transparent); backdrop-filter: blur(4px); }
+.order-dialog[open] { animation: order-dialog-in .18s ease-out; }
+@keyframes order-dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .order-dialog[open] { animation: none; } }
+.order-dialog-body { display: grid; gap: 18px; padding: 20px; }
+.order-dialog-head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; }
+.order-dialog-thumb { width: 76px; height: 76px; border-radius: 12px; object-fit: cover; background: var(--color-canvas); }
+.order-dialog-head.has-thumb { grid-template-columns: 76px 1fr auto; }
+.order-dialog-head h2 { margin: 4px 0; color: var(--color-text-heading); font-size: 20px; letter-spacing: -.03em; }
+.order-dialog-head p:not(.eyebrow) { margin: 0; color: var(--color-text-subtle); font-size: 12px; }
+.order-dialog-close { align-self: start; width: 34px; height: 34px; border: 1px solid var(--color-border); border-radius: 999px; background: transparent; color: var(--color-text-muted); font-size: 20px; line-height: 1; cursor: pointer; }
+.order-dialog-close:hover { color: var(--color-text-heading); border-color: var(--color-border-strong); }
+.order-dialog .order-color-picker, .order-dialog .order-extras { margin-top: 0; }
+.order-dialog-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+.order-dialog-foot span { color: var(--color-text-subtle); font-size: 12px; }
+.order-dialog-foot strong { display: block; color: var(--color-brand); font-size: 26px; letter-spacing: -.04em; }
+.order-dialog-foot strong small { font-size: 13px; letter-spacing: 0; }
+.order-dialog-foot p { margin: 4px 0 0; color: var(--color-text-subtle); font-size: 11px; line-height: 1.6; }
+.order-dialog-foot .primary-button { flex: 0 0 auto; }
+.order-dialog-notice { margin: -6px 0 0; color: var(--color-brand); font-size: 13px; }
+.order-dialog-notice.error { color: var(--color-danger-text); }
+@media (max-width: 560px) { .order-dialog-head.has-thumb { grid-template-columns: 56px 1fr auto; } .order-dialog-thumb { width: 56px; height: 56px; } .order-dialog-foot { flex-direction: column; align-items: stretch; } .order-dialog-foot .primary-button { width: 100%; justify-content: center; } }
